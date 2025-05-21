@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ScriptFlow.js - Visual Scripting</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app-container">
+        <div id="block-palette">
+            <h2>Blocks</h2>
+            <!-- Blocks will be populated here by script.js -->
+        </div>
+        <div id="workspace-container">
+            <div id="workspace">
+                <svg id="connection-layer" width="100%" height="100%" style="position: absolute; top: 0; left: 0; pointer-events: none;"></svg>
+                <!-- Draggable blocks will appear here -->
+            </div>
+        </div>
+        <div id="code-output-container">
+            <h2>Generated Code</h2>
+            <button id="generate-code-btn">Generate Code</button>
+            <pre id="generated-code">// Code will appear here</pre>
+        </div>
+    </div>
+
+    <script src="blocks.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

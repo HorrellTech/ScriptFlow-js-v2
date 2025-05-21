@@ -1,0 +1,598 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background-color: #2d3748; /* Dark background */
+    color: #e2e8f0; /* Light text */
+}
+
+#app-container {
+    display: flex;
+    flex-grow: 1;
+    overflow: hidden;
+}
+
+#block-palette {
+    width: 220px; /* Slightly wider */
+    background-color: #1a202c; /* Darker palette background */
+    padding: 15px;
+    overflow-y: auto;
+    border-right: 1px solid #4a5568; /* Darker border */
+}
+
+#block-palette h2 {
+    margin-top: 0;
+    font-size: 1.3em;
+    text-align: center;
+    color: #a0aec0; /* Lighter heading */
+    margin-bottom: 15px;
+}
+
+.palette-block {
+    background-color: #2d3748; /* Dark block background */
+    border: 1px solid #4a5568; /* Darker border */
+    color: #e2e8f0; /* Light text */
+    padding: 10px;
+    margin-bottom: 10px;
+    cursor: grab;
+    text-align: center;
+    border-radius: 5px;
+    font-size: 0.95em;
+    transition: background-color 0.2s;
+}
+
+.palette-block:hover {
+    background-color: #4a5568; /* Hover effect */
+}
+
+#workspace-container {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background-color: #2d3748; /* Match body */
+}
+
+#workspace {
+    flex-grow: 1;
+    background-color: #1a202c; /* Dark workspace */
+    position: relative; 
+    overflow: auto; 
+    border: 1px solid #4a5568; /* Darker border */
+    min-width: 3000px; /* Start with a reasonably large size */
+    min-height: 3000px;
+    background-image: linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px), 
+                      linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+    background-size: 20px 20px; /* Grid size */
+    background-position: 0 0;
+    transition: background-position 0.1s ease-out;
+    will-change: transform, left, top;
+}
+
+.script-block {
+    position: absolute;
+    /* background-color will be set by JS based on block type */
+    color: white;
+    border: 1px solid #000; /* Fallback, will be overridden by JS */
+    border-radius: 6px;
+    padding: 12px;
+    min-width: 160px;
+    cursor: move;
+    user-select: none;
+    /* Glow effect for blocks */
+    box-shadow: 0 0 10px rgba(129, 230, 217, 0.3), 0 0 20px rgba(129, 230, 217, 0.2); /* Teal glow */
+    font-size: 0.9em;
+    transition: box-shadow 0.3s ease-in-out, transform 0.2s ease;
+    transform-origin: top left;
+    z-index: 10;
+}
+
+.script-block:hover {
+    box-shadow: 0 0 15px rgba(129, 230, 217, 0.5), 0 0 30px rgba(129, 230, 217, 0.3);
+}
+
+.script-block-header {
+    font-weight: bold;
+    margin-bottom: 8px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid rgba(255,255,255,0.2);
+    text-align: center;
+}
+
+.script-block-content {
+    padding-top: 5px;
+}
+
+.script-block-content label {
+    display: block;
+    margin-bottom: 3px;
+    font-size: 0.85em;
+    color: #cbd5e0;
+}
+
+.script-block-content input[type="text"],
+.script-block-content input[type="checkbox"] {
+    width: calc(100% - 12px);
+    margin-bottom: 8px;
+    padding: 5px;
+    background-color: #2d3748; /* Dark input */
+    border: 1px solid #4a5568; /* Darker border */
+    color: #e2e8f0; /* Light text */
+    border-radius: 3px;
+    box-sizing: border-box;
+}
+.script-block-content input[type="checkbox"] {
+    width: auto;
+    margin-right: 5px;
+}
+
+
+.connector {
+    width: 20px; /* Larger to fit text */
+    height: 20px; /* Larger to fit text */
+    background-color: #ecc94b; /* Yellow */
+    border: 1px solid #d69e2e; /* Darker yellow */
+    border-radius: 50%;
+    position: absolute;
+    cursor: crosshair;
+    z-index: 10; 
+    box-shadow: 0 0 5px rgba(236, 201, 75, 0.5);
+    transition: box-shadow 0.2s ease-in-out, background-color 0.2s ease-in-out;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.connector:hover {
+    background-color: #f6e05e; /* Lighter yellow on hover */
+    box-shadow: 0 0 8px rgba(236, 201, 75, 0.8), 0 0 12px rgba(236, 201, 75, 0.6);
+}
+
+.connector-text {
+    font-size: 8px;
+    color: #000;
+    font-weight: bold;
+    pointer-events: none; /* Ensure text doesn't interfere with clicks */
+    text-transform: uppercase;
+    text-shadow: 0 0 1px rgba(255, 255, 255, 0.7);
+}
+
+.connector-child { /* Top flow input connector */
+    top: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    --connector-direction: 'vertical'; 
+}
+
+.connector-parent { /* Bottom flow output connector */
+    bottom: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    --connector-direction: 'vertical';
+}
+
+.connector-input { /* Left data input connector */
+    left: -10px;
+    /* top will be set dynamically for multiple inputs */
+    background-color: #63b3ed; /* Blue for data inputs */
+    border-color: #3182ce;
+    box-shadow: 0 0 5px rgba(99, 179, 237, 0.5);
+    --connector-direction: 'horizontal';
+}
+
+.connector-input:hover {
+    background-color: #90cdf4;
+}
+
+.connector-output { /* Right data output connector */
+    right: -10px;
+    /* top will be set dynamically for multiple outputs */
+    background-color: #68d391; /* Green for data outputs */
+    border-color: #38a169;
+    box-shadow: 0 0 5px rgba(104, 211, 145, 0.5);
+    --connector-direction: 'horizontal';
+}
+
+.connector-output:hover {
+    background-color: #9ae6b4;
+}
+
+/* Remove connector labels since text is now inside connectors */
+.connector-label {
+    display: none;
+}
+
+#code-output-container {
+    width: 350px; /* Slightly wider */
+    background-color: #1a202c; /* Darker background */
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid #4a5568; /* Darker border */
+}
+
+#code-output-container h2 {
+    margin-top: 0;
+    font-size: 1.3em;
+    text-align: center;
+    color: #a0aec0; /* Lighter heading */
+    margin-bottom: 10px;
+}
+
+#generate-code-btn {
+    padding: 12px;
+    background-color: #38a169; /* Green */
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-bottom: 15px;
+    font-size: 1em;
+    transition: background-color 0.2s;
+}
+
+#generate-code-btn:hover {
+    background-color: #2f855a; /* Darker green */
+}
+
+#generated-code {
+    flex-grow: 1;
+    background-color: #000; /* Black for code area */
+    color: #90cdf4; /* Light blue for code text */
+    padding: 15px;
+    border-radius: 5px;
+    overflow-y: auto;
+    white-space: pre-wrap; 
+    font-family: "Fira Code", "Courier New", Courier, monospace; /* Fira Code if available */
+    font-size: 0.9em;
+    border: 1px solid #4a5568; /* Darker border */
+    line-height: 1.4;
+}
+
+/* Add these styles for the collapsible block categories */
+
+/* Block category styles */
+.block-category {
+    margin-bottom: 10px;
+    background-color: #2d3748;
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+.category-header {
+    padding: 8px 10px;
+    cursor: pointer;
+    font-weight: bold;
+    background-color: #4a5568;
+    color: #e2e8f0;
+    display: flex;
+    align-items: center;
+    transition: background-color 0.2s;
+}
+
+.category-header:hover {
+    background-color: #5a6678;
+}
+
+.category-toggle {
+    margin-right: 6px;
+    display: inline-block;
+    transition: transform 0.2s;
+    width: 12px;
+    text-align: center;
+}
+
+.category-content {
+    padding: 5px;
+    transition: max-height 0.3s ease-out, opacity 0.3s;
+    max-height: 1000px; /* Large enough to contain content */
+    opacity: 1;
+    overflow: hidden;
+}
+
+.category-content.collapsed {
+    max-height: 0;
+    padding: 0 5px;
+    opacity: 0;
+}
+
+/* Connection line styling */
+.connection-line {
+    stroke: #a0aec0; /* Light gray for lines */
+    stroke-width: 2.5;
+    fill: none; /* Important for paths */
+    pointer-events: stroke; /* Allow events on the stroke for interaction */
+    /* Glow effect for connection lines */
+    filter: drop-shadow(0 0 3px rgba(160, 174, 192, 0.7)) drop-shadow(0 0 8px rgba(160, 174, 192, 0.5));
+    transition: stroke 0.2s, filter 0.2s;
+}
+
+.temp-connection-line {
+    stroke: #90cdf4; /* Bright blue for temporary line */
+    stroke-width: 2;
+    stroke-dasharray: 5,5; /* Dashed line */
+    filter: drop-shadow(0 0 5px rgba(144, 205, 244, 0.8));
+}
+
+.connection-line:hover {
+    stroke: #f0f4f8; /* Brighter on hover */
+    filter: drop-shadow(0 0 5px rgba(160, 174, 192, 0.9)) drop-shadow(0 0 10px rgba(160, 174, 192, 0.7));
+    cursor: pointer;
+}
+
+/* Code output formatting */
+#generated-code {
+    background-color: #2d3748;
+    color: #e2e8f0;
+    border: 1px solid #4a5568;
+    border-radius: 5px;
+    padding: 15px;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    white-space: pre;
+    overflow-x: auto;
+    line-height: 1.5;
+    tab-size: 4;
+    font-size: 14px;
+}
+
+/* Syntax highlighting for the generated code */
+.keyword { color: #81a1c1; }
+.string { color: #a3be8c; }
+.number { color: #b48ead; }
+.comment { color: #616e88; font-style: italic; }
+
+/* Workspace enhancements for infinite canvas */
+#workspace {
+    position: relative;
+    overflow: auto;
+    cursor: default;
+    min-width: 3000px; /* Start with a reasonably large size */
+    min-height: 3000px;
+    background-image: linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px), 
+                      linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+    background-size: 20px 20px; /* Grid size */
+    background-position: 0 0;
+    transition: background-position 0.1s ease-out;
+}
+
+/* Make SVG layer match the workspace exactly */
+#connection-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 10;
+    transform-origin: 0 0;
+    will-change: transform, left, top;
+}
+
+#connection-layer path,
+#connection-layer circle {
+    pointer-events: all;
+}
+
+.script-block {
+    position: absolute;
+    transform-origin: top left;
+    z-index: 10;
+    /* Other existing styles */
+}
+
+/* Zoom controls */
+.workspace-controls {
+    position: fixed; /* Change to fixed to keep visible when panning */
+    bottom: 20px;
+    right: 20px;
+    background-color: rgba(26, 32, 44, 0.9); /* More opaque */
+    padding: 8px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    z-index: 1000; /* Ensure it's above everything */
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+/* Delete Button for Blocks */
+.delete-block {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 18px;
+    height: 18px;
+    line-height: 16px;
+    text-align: center;
+    background-color: rgba(229, 62, 62, 0.6);
+    color: white;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 14px;
+    z-index: 5;
+    opacity: 0.6;
+    transition: opacity 0.2s, background-color 0.2s;
+}
+
+.delete-block:hover {
+    opacity: 1;
+    background-color: rgba(229, 62, 62, 0.9);
+}
+
+/* Workspace Controls */
+.workspace-controls {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    background-color: rgba(26, 32, 44, 0.8);
+    padding: 5px;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    z-index: 100;
+}
+
+.workspace-controls button {
+    background-color: #2d3748;
+    color: #e2e8f0;
+    border: 1px solid #4a5568;
+    width: 30px;
+    height: 30px;
+    border-radius: 4px;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+.workspace-controls button:hover {
+    background-color: #4a5568;
+}
+
+.workspace-controls button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.workspace-controls .divider {
+    width: 1px;
+    height: 20px;
+    background-color: #4a5568;
+    margin: 0 5px;
+}
+
+/* Scale transition */
+.script-block {
+    transition: transform 0.2s ease;
+}
+
+#workspace {
+    position: relative;
+    overflow: auto;
+    cursor: default;
+}
+
+#workspace.panning {
+    cursor: move;
+}
+
+#connection-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+#connection-layer path,
+#connection-layer circle {
+    pointer-events: all;
+}
+
+#workspace, #connection-layer {
+    transition: transform 0.2s ease;
+}
+
+/* Make sure the SVG layer covers the entire workspace */
+#connection-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 5;
+}
+
+/* Enhanced Input Styling */
+.script-block-content input[type="text"],
+.script-block-content input[type="number"] {
+    width: calc(100% - 12px);
+    margin-bottom: 8px;
+    padding: 5px;
+    background-color: #2d3748;
+    border: 1px solid #4a5568;
+    color: #e2e8f0;
+    border-radius: 3px;
+    font-size: 0.9em;
+    box-sizing: border-box;
+}
+
+.script-block-content input[type="number"] {
+    width: 80px;
+}
+
+.script-block-content textarea.input-multiline {
+    width: calc(100% - 12px);
+    margin-bottom: 8px;
+    padding: 5px;
+    background-color: #2d3748;
+    border: 1px solid #4a5568;
+    color: #e2e8f0;
+    border-radius: 3px;
+    resize: vertical;
+    min-height: 60px;
+    font-family: inherit;
+    font-size: 0.9em;
+}
+
+.script-block-content select.input-select {
+    width: calc(100% - 12px);
+    margin-bottom: 8px;
+    padding: 5px;
+    background-color: #2d3748;
+    border: 1px solid #4a5568;
+    color: #e2e8f0;
+    border-radius: 3px;
+    font-size: 0.9em;
+}
+
+.script-block-content select.input-select option {
+    background-color: #1a202c;
+    color: #e2e8f0;
+}
+
+.script-block-content .input-checkbox-container {
+    display: flex;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.script-block-content input[type="checkbox"] {
+    width: auto;
+    margin-right: 8px;
+    margin-left: 2px;
+    appearance: none;
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    background-color: #2d3748;
+    border: 1px solid #4a5568;
+    border-radius: 3px;
+    cursor: pointer;
+    position: relative;
+    vertical-align: middle;
+}
+
+.script-block-content input[type="checkbox"]:checked {
+    background-color: #4299e1;
+    border-color: #2b6cb0;
+}
+
+.script-block-content input[type="checkbox"]:checked::after {
+    content: '✓';
+    font-size: 12px;
+    color: #fff;
+    position: absolute;
+    top: -1px;
+    left: 3px;
+}
+
