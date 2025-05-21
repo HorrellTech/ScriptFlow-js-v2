@@ -768,7 +768,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Add event listeners for the connection line
         pathElement.addEventListener('contextmenu', (e) => {
             e.preventDefault();
-            rightClickedConnectionId = connectionId;
+            rightClickedConnectionId = connectionId; // This sets the correct ID
             showConnectionContextMenu(e.clientX, e.clientY);
         });
         
@@ -784,6 +784,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const dotElement = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
         dotElement.setAttribute('class', 'connection-dot');
         dotElement.setAttribute('r', '4'); // Ensure radius is set
+
+        dotElement.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            rightClickedConnectionId = connectionId;
+            showConnectionContextMenu(e.clientX, e.clientY);
+        });
         
         // Create animateMotion element for the dot
         const animateMotionElement = document.createElementNS('http://www.w3.org/2000/svg', 'animateMotion');
@@ -884,13 +890,18 @@ document.addEventListener('DOMContentLoaded', () => {
     function showConnectionContextMenu(x, y) {
         hideContextMenu(); // Remove any existing menu
         
+        console.log("Right-clicked connection ID:", rightClickedConnectionId);
+        
         contextMenu = document.createElement('div');
         contextMenu.className = 'context-menu';
         
         const deleteItem = document.createElement('div');
         deleteItem.className = 'context-menu-item danger';
         deleteItem.textContent = 'Delete Connection';
-        deleteItem.addEventListener('click', deleteSelectedConnection);
+        deleteItem.addEventListener('click', () => {
+            console.log("Delete connection item clicked, ID:", rightClickedConnectionId);
+            deleteSelectedConnection();
+        });
         
         contextMenu.appendChild(deleteItem);
         document.body.appendChild(contextMenu);
@@ -939,18 +950,22 @@ document.addEventListener('DOMContentLoaded', () => {
         if (contextMenu) {
             document.body.removeChild(contextMenu);
             contextMenu = null;
-            rightClickedConnectionId = null;
+            // DO NOT clear rightClickedConnectionId here
             rightClickedConnectorElement = null;
         }
     }
-    
+
     function deleteSelectedConnection() {
+        console.log("Deleting connection:", rightClickedConnectionId);
+        
         if (rightClickedConnectionId) {
             removeConnection(rightClickedConnectionId);
             hideContextMenu();
-            
+
             // Save state after deleting a connection
             saveState();
+        } else {
+            console.error("No connection ID was set - deletion failed");
         }
     }
     
