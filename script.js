@@ -443,70 +443,66 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     workspace.addEventListener('drop', (e) => {
-    e.preventDefault();
-    if (activeDrag && activeDrag.isNew) {
-        const type = e.dataTransfer.getData('text/plain') || activeDrag.type;
-        const workspaceRect = workspace.getBoundingClientRect();
-        
-        // These calculations were the source of the issue
-        // We need to directly map screen coordinates to model coordinates
-        
-        // Get mouse position in screen coordinates relative to viewport
-        const mouseScreenX = e.clientX;
-        const mouseScreenY = e.clientY;
-        
-        // Get mouse position relative to workspace's transformed position
-        const relativeX = mouseScreenX - workspaceRect.left;
-        const relativeY = mouseScreenY - workspaceRect.top;
-        
-        // Convert to model coordinates by accounting for transform
-        // This is the proper conversion from screen to model space
-        const modelX = relativeX / scale + panX;
-        const modelY = relativeY / scale + panY;
-        
-        console.log('Drop position:', { 
-            screen: { x: mouseScreenX, y: mouseScreenY },
-            relative: { x: relativeX, y: relativeY },
-            model: { x: modelX, y: modelY },
-            transform: { panX, panY, scale }
-        });
-        
-        // Create the block initially at the exact drop position
-        const block = createBlock(type, modelX, modelY);
-        
-        // Center the block on the cursor after it's created
-        setTimeout(() => {
-            if (block && block.element) {
-                const blockWidth = block.element.offsetWidth;
-                const blockHeight = block.element.offsetHeight;
-                
-                // Adjust position to center the block on the cursor
-                block.element.style.left = `${modelX - blockWidth/2}px`;
-                block.element.style.top = `${modelY - blockHeight/2}px`;
-                
-                updateAllConnectionLines();
-                saveState();
+        e.preventDefault();
+        if (activeDrag && activeDrag.isNew) {
+            const type = e.dataTransfer.getData('text/plain') || activeDrag.type;
+            const workspaceRect = workspace.getBoundingClientRect();
+            
+            // Get mouse position in screen coordinates
+            const mouseScreenX = e.clientX;
+            const mouseScreenY = e.clientY;
+            
+            // Get mouse position relative to workspace's top-left corner on screen
+            const relativeX = mouseScreenX - workspaceRect.left;
+            const relativeY = mouseScreenY - workspaceRect.top;
+            
+            // Convert to model coordinates accounting for transform
+            const modelX = relativeX / scale + panX;
+            const modelY = relativeY / scale + panY;
+            
+            // Create a block with the correct type
+            const blockDefinition = BLOCK_DEFINITIONS[type];
+            if (!blockDefinition) {
+                console.error("Unknown block type:", type);
+                activeDrag = null;
+                return;
             }
-        }, 0);
-    }
-    activeDrag = null;
-});
+
+            // Create the block at the calculated model position
+            const block = createBlock(type, modelX, modelY);
+            
+            // After block is created, center it on the cursor position
+            requestAnimationFrame(() => {
+                if (block && block.element) {
+                    const blockWidth = block.element.offsetWidth;
+                    const blockHeight = block.element.offsetHeight;
+                    
+                    // Center the block on the cursor
+                    block.element.style.left = `${modelX - blockWidth/2}px`;
+                    block.element.style.top = `${modelY - blockHeight/2}px`;
+                    
+                    updateAllConnectionLines();
+                    saveState();
+                }
+            });
+        }
+        activeDrag = null;
+    });
 
     function createBlock(type, x, y) {
         const definition = BLOCK_DEFINITIONS[type];
         if (!definition) return;
-
-        // Additional debugging
-        console.log('Creating block at:', { x, y });
 
         const blockId = `block-${nextBlockId++}`;
         const blockElement = document.createElement('div');
         blockElement.id = blockId;
         blockElement.className = 'script-block';
         
-        // Position the block - ensure these are numbers with px units
+        // Position the block in model coordinates (not screen coordinates)
+        // Use Math.round for more precise positioning
         blockElement.style.left = `${Math.round(x)}px`;
         blockElement.style.top = `${Math.round(y)}px`;
+        
         
         blockElement.style.backgroundColor = definition.color || '#60a5fa';
         blockElement.style.borderColor = definition.color ? darkenColor(definition.color, 30) : '#4a5568';
@@ -1795,12 +1791,13 @@ document.addEventListener('DOMContentLoaded', () => {
         svgLayer.style.transformOrigin = '0 0';
         
         // Set grid background to match pan exactly
-        // The key fix: we need to use translateX/Y directly, not panX/Y
         workspace.style.backgroundPosition = `${translateX}px ${translateY}px`;
         workspace.style.backgroundSize = `${20 * scale}px ${20 * scale}px`;
         
-        // Update connection lines AFTER the browser has a chance to apply the transform
-        updateAfterTransform(); // MODIFIED: Was a direct call to updateAllConnectionLines()
+        // Update connection lines AFTER the transform has been applied
+        requestAnimationFrame(() => {
+            updateAllConnectionLines();
+        });
     }
 
     function updateAfterTransform() {
