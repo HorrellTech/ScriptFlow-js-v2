@@ -3,6 +3,7 @@ const BLOCK_DEFINITIONS = {
         type: "start",
         label: "Start",
         color: "#22c55e", // Green
+        category: "Flow Control",
         hasFlowIn: false,
         hasFlowOut: true,
         inputs: [
@@ -18,6 +19,7 @@ const BLOCK_DEFINITIONS = {
         type: "comment",
         label: "Comment",
         color: "#22c55e", // Green
+        category: "Misc",
         hasFlowIn: true,
         hasFlowOut: true,
         inputs: [
@@ -33,6 +35,7 @@ const BLOCK_DEFINITIONS = {
         type: "log",
         label: "Log Message",
         color: "#3b82f6", // Blue
+        category: "Input/Output",
         hasFlowIn: true,
         hasFlowOut: true,
         inputs: [
@@ -48,6 +51,7 @@ const BLOCK_DEFINITIONS = {
         type: "variable_declare",
         label: "Declare Variable",
         color: "#a855f7", // Purple
+        category: "Variables",
         hasFlowIn: true,
         hasFlowOut: true,
         inputs: [
@@ -95,6 +99,7 @@ const BLOCK_DEFINITIONS = {
         type: "if_condition",
         label: "If Condition",
         color: "#dd6b20", // Darker Orange for dark theme
+        category: "Flow Control",
         hasFlowIn: true,
         hasFlowOut: true, // Main flow out (after if block)
         hasBranchFlowOut: true, // For the 'true' branch
@@ -125,6 +130,7 @@ const BLOCK_DEFINITIONS = {
         type: "boolean_value",
         label: "Boolean Value",
         color: "#4c1d95", // Deep purple
+        category: "Logic", 
         hasFlowIn: false, // Not part of the flow
         hasFlowOut: false, // Not part of the flow
         inputs: [
@@ -146,6 +152,7 @@ const BLOCK_DEFINITIONS = {
         type: "class_definition",
         label: "Class Definition",
         color: "#0e7490", // Teal
+        category: "Objects", 
         hasFlowIn: true,
         hasFlowOut: true,
         isContainer: true, // Indicate this is a container block
@@ -171,6 +178,7 @@ const BLOCK_DEFINITIONS = {
         type: "constructor_definition",
         label: "Constructor",
         color: "#0369a1", // Lighter blue
+        category: "Objects", 
         hasFlowIn: true,
         hasFlowOut: true,
         isContainer: true,
@@ -198,6 +206,7 @@ const BLOCK_DEFINITIONS = {
         type: "function_definition",
         label: "Function Definition",
         color: "#7e22ce", // Indigo
+        category: "Functions", 
         hasFlowIn: true,
         hasFlowOut: true,
         isContainer: true,
@@ -227,6 +236,7 @@ const BLOCK_DEFINITIONS = {
         type: "method_definition",
         label: "Method Definition",
         color: "#0891b2", // Cyan
+        category: "Objects", 
         hasFlowIn: true,
         hasFlowOut: true,
         isContainer: true,

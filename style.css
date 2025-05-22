@@ -596,3 +596,251 @@ body {
     left: 3px;
 }
 
+/* Context Menu styling */
+.context-menu {
+    position: fixed;
+    z-index: 1000;
+    background-color: #1a202c;
+    border: 1px solid #4a5568;
+    border-radius: 5px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    min-width: 150px;
+    padding: 5px 0;
+}
+
+.context-menu-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #e2e8f0;
+    transition: background-color 0.2s;
+}
+
+.context-menu-item:hover {
+    background-color: #2d3748;
+}
+
+.context-menu-item.danger {
+    color: #fc8181;
+}
+
+.context-menu-item.danger:hover {
+    background-color: rgba(229, 62, 62, 0.2);
+}
+
+/* Make connections more visible on hover */
+.connection-line.hover {
+    stroke: #fc8181;
+    stroke-width: 4;
+    filter: drop-shadow(0 0 8px rgba(252, 129, 129, 0.8));
+}
+
+/* Connection dot styling */
+.connection-dot {
+    fill: #ecc94b;
+    r: 4;
+    filter: drop-shadow(0 0 3px rgba(236, 201, 75, 0.7));
+}
+
+/* Modern Block Palette Styling */
+#block-palette {
+    width: 250px; /* Slightly wider */
+    background-color: #1a202c; /* Darker palette background */
+    padding: 15px;
+    overflow-y: auto;
+    border-right: 1px solid #4a5568; /* Darker border */
+    box-shadow: inset -2px 0 8px rgba(0, 0, 0, 0.2);
+}
+
+#block-palette h2 {
+    margin-top: 0;
+    font-size: 1.3em;
+    text-align: center;
+    color: #a0aec0; /* Lighter heading */
+    margin-bottom: 15px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid #4a5568;
+    padding-bottom: 10px;
+}
+
+/* Enhanced Block Category Styles */
+.block-category {
+    margin-bottom: 12px;
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.block-category:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.category-header {
+    padding: 10px 12px;
+    cursor: pointer;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    transition: all 0.2s ease;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    position: relative;
+    overflow: hidden;
+}
+
+.category-header::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 20px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1));
+    pointer-events: none;
+}
+
+.category-header:hover {
+    filter: brightness(1.2);
+}
+
+.category-toggle {
+    margin-right: 8px;
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    text-align: center;
+    line-height: 16px;
+    font-size: 10px;
+    transition: transform 0.3s ease;
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+}
+
+.category-content {
+    padding: 6px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    max-height: 500px;
+    opacity: 1;
+    background-color: #2d3748;
+    overflow: hidden;
+}
+
+.category-content.collapsed {
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    opacity: 0;
+}
+
+/* Modern Palette Block Styling */
+.palette-block {
+    background-color: #2d3748; /* Base background */
+    color: #e2e8f0; /* Light text */
+    padding: 10px 12px;
+    margin: 6px 3px;
+    cursor: grab;
+    border-radius: 5px;
+    font-size: 0.9em;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    display: flex;
+    align-items: center;
+}
+
+.palette-block:hover {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.palette-block:active {
+    cursor: grabbing;
+    transform: translateY(0) scale(0.98);
+}
+
+.palette-block::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 4px; /* Left accent border */
+    /* Color will be set dynamically to match category */
+}
+
+/* Category-specific block styling (these colors match your categories) */
+.category-flow-control .palette-block {
+    border-left: 4px solid #f97316; /* Orange */
+}
+
+.category-logic .palette-block {
+    border-left: 4px solid #0ea5e9; /* Sky blue */
+}
+
+.category-math .palette-block {
+    border-left: 4px solid #8b5cf6; /* Violet */
+}
+
+.category-variables .palette-block {
+    border-left: 4px solid #ec4899; /* Pink */
+}
+
+.category-strings .palette-block {
+    border-left: 4px solid #10b981; /* Emerald */
+}
+
+.category-input-output .palette-block {
+    border-left: 4px solid #84cc16; /* Lime */
+}
+
+.category-functions .palette-block {
+    border-left: 4px solid #6366f1; /* Indigo */
+}
+
+.category-arrays .palette-block {
+    border-left: 4px solid #f59e0b; /* Amber */
+}
+
+.category-objects .palette-block {
+    border-left: 4px solid #14b8a6; /* Teal */
+}
+
+.category-misc .palette-block {
+    border-left: 4px solid #6b7280; /* Gray */
+}
+
+/* Block icon/indicator */
+.palette-block-icon {
+    margin-right: 8px;
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+/* Drag state */
+.palette-block.dragging {
+    opacity: 0.6;
+    background-color: #4a5568 !important;
+}
+
+/* Visual "ghost" effect while dragging */
+.palette-block.dragging::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: repeating-linear-gradient(
+        45deg,
+        rgba(255, 255, 255, 0.1),
+        rgba(255, 255, 255, 0.1) 5px,
+        transparent 5px,
+        transparent 10px
+    );
+    pointer-events: none;
+}

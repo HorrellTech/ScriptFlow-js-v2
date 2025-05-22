@@ -4,6 +4,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const generateCodeBtn = document.getElementById('generate-code-btn');
     const generatedCodeArea = document.getElementById('generated-code');
     const svgLayer = document.getElementById('connection-layer');
+    const canvas = document.getElementById('connection-layer-canvas');
+    //const ctx = canvas.getContext('2d');
 
     // State variables
     let blocks = [];
@@ -56,17 +58,24 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function getConnectorPosition(connectorElement) {
-        // Get the absolute position in the DOM
-        const rect = connectorElement.getBoundingClientRect();
-        const workspaceRect = workspace.getBoundingClientRect();
+        if (!connectorElement) return { x: 0, y: 0 };
+        
+        const rect = connectorElement.getBoundingClientRect(); // Connector's screen bounds
+        const workspaceRect = workspace.getBoundingClientRect(); // Transformed workspace's screen bounds
 
-        // Calculate the position in untransformed workspace coordinates
-        // We need to convert from screen pixels to SVG coordinate system
-        // Subtract pan offset (multiplied by scale) to align with transformed workspace
-        const x = (rect.left + rect.width / 2 - workspaceRect.left) / scale + panX;
-        const y = (rect.top + rect.height / 2 - workspaceRect.top) / scale + panY;
+        // Center of the connector in screen coordinates
+        const connectorScreenX = rect.left + rect.width / 2;
+        const connectorScreenY = rect.top + rect.height / 2;
 
-        return { x, y };
+        // Position of the connector relative to the transformed workspace's top-left corner on screen
+        const relativeScreenX = connectorScreenX - workspaceRect.left;
+        const relativeScreenY = connectorScreenY - workspaceRect.top;
+
+        // Convert back to untransformed workspace (model) coordinates
+        const modelX = (relativeScreenX / scale) + panX;
+        const modelY = (relativeScreenY / scale) + panY;
+        
+        return { x: modelX, y: modelY };
     }
 
     function calculateBezierPath(x1, y1, x2, y2, dir1, dir2) {
@@ -100,32 +109,46 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Connection line functions
     function updateConnectionLine(connection) {
-        if (!connection.fromConnectorElement || !connection.toConnectorElement) return;
+        if (!connection || !connection.fromConnectorElement || !connection.toConnectorElement) {
+            console.warn("Cannot update connection, missing elements:", connection?.id);
+            return;
+        }
         
-        // Get precise positions of connectors in the workspace coordinate system
-        const fromPos = getConnectorPosition(connection.fromConnectorElement);
-        const toPos = getConnectorPosition(connection.toConnectorElement);
-        
-        // Get connector directions from CSS variables
-        const fromDir = getComputedStyle(connection.fromConnectorElement).getPropertyValue('--connector-direction').trim() || 'horizontal';
-        const toDir = getComputedStyle(connection.toConnectorElement).getPropertyValue('--connector-direction').trim() || 'horizontal';
-        
-        // Calculate the path with proper control points
-        const pathData = calculateBezierPath(
-            fromPos.x, fromPos.y, 
-            toPos.x, toPos.y, 
-            fromDir, toDir
-        );
-        
-        // Update the SVG path
-        connection.pathElement.setAttribute('d', pathData);
+        try {
+            // Get precise positions of connectors in the workspace coordinate system
+            const fromPos = getConnectorPosition(connection.fromConnectorElement);
+            const toPos = getConnectorPosition(connection.toConnectorElement);
+            
+            // Get connector directions from CSS variables
+            const fromDir = getComputedStyle(connection.fromConnectorElement).getPropertyValue('--connector-direction').trim() || 'horizontal';
+            const toDir = getComputedStyle(connection.toConnectorElement).getPropertyValue('--connector-direction').trim() || 'horizontal';
+            
+            // Calculate the path with proper control points
+            const pathData = calculateBezierPath(
+                fromPos.x, fromPos.y, 
+                toPos.x, toPos.y, 
+                fromDir, toDir
+            );
+            
+            // Update the SVG path
+            if (connection.pathElement) {
+                connection.pathElement.setAttribute('d', pathData);
+            }
+        } catch (error) {
+            console.error("Error updating connection line:", error);
+        }
     }
 
     function updateAllConnectionLines() {
-        // Don't use requestAnimationFrame here - we want immediate updates
-        // to prevent the "delayed" effect that causes parallax-like movement
-        connections.forEach(conn => {
-            updateConnectionLine(conn);
+        // First filter out any invalid connections
+        connections = connections.filter(conn => 
+            conn && conn.fromConnectorElement && conn.toConnectorElement && 
+            conn.pathElement && conn.pathElement.parentNode
+        );
+        
+        // Then update all valid connections
+        connections.forEach(connection => {
+            updateConnectionLine(connection);
         });
     }
 
@@ -286,6 +309,20 @@ document.addEventListener('DOMContentLoaded', () => {
     function populateBlockPalette() {
         blockPalette.innerHTML = '<h2>Blocks</h2>';
         
+        // Define category colors
+        const categoryColors = {
+            'Flow Control': '#f97316', // Orange
+            'Logic': '#0ea5e9',        // Sky blue
+            'Math': '#8b5cf6',         // Violet
+            'Variables': '#ec4899',    // Pink
+            'Strings': '#10b981',      // Emerald
+            'Input/Output': '#84cc16', // Lime
+            'Functions': '#6366f1',    // Indigo
+            'Arrays': '#f59e0b',       // Amber
+            'Objects': '#14b8a6',      // Teal
+            'Misc': '#6b7280'          // Gray
+        };
+        
         // Group blocks by category
         const categories = {};
         Object.values(BLOCK_DEFINITIONS).forEach(def => {
@@ -321,32 +358,74 @@ document.addEventListener('DOMContentLoaded', () => {
             const categoryContainer = document.createElement('div');
             categoryContainer.className = 'block-category';
             
+            // Add a category-specific class for CSS targeting
+            const categorySlug = category.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+            categoryContainer.classList.add(`category-${categorySlug}`);
+            
+            // Set a background color for the category if defined
+            const categoryColor = categoryColors[category] || '#6b7280';
+            
             const categoryHeader = document.createElement('div');
             categoryHeader.className = 'category-header';
-            categoryHeader.innerHTML = `<span class="category-toggle">▼</span> ${category}`;
+            categoryHeader.style.backgroundColor = categoryColor;
+            categoryHeader.style.color = '#ffffff';
+            
+            // Create toggle with correct starting state
+            const toggleSpan = document.createElement('span');
+            toggleSpan.className = 'category-toggle';
+            toggleSpan.textContent = '▼';
+            
+            categoryHeader.appendChild(toggleSpan);
+            categoryHeader.appendChild(document.createTextNode(` ${category}`));
+            
+            // Click anywhere on the header to toggle
             categoryHeader.addEventListener('click', () => {
                 categoryContent.classList.toggle('collapsed');
-                const toggle = categoryHeader.querySelector('.category-toggle');
-                toggle.textContent = categoryContent.classList.contains('collapsed') ? '►' : '▼';
+                toggleSpan.textContent = categoryContent.classList.contains('collapsed') ? '►' : '▼';
+                toggleSpan.style.transform = categoryContent.classList.contains('collapsed') ? 'rotate(0deg)' : 'rotate(90deg)';
             });
             
             const categoryContent = document.createElement('div');
             categoryContent.className = 'category-content';
+            // Optional: Start with some categories collapsed
+            if (['Arrays', 'Objects', 'Misc'].includes(category)) {
+                categoryContent.classList.add('collapsed');
+                toggleSpan.textContent = '►';
+            }
             
             // Add blocks to this category
             categories[category].forEach(def => {
                 const paletteBlock = document.createElement('div');
                 paletteBlock.className = 'palette-block';
-                paletteBlock.textContent = def.label;
-                paletteBlock.style.backgroundColor = def.color || '#ddd';
-                if (def.color) paletteBlock.style.borderColor = darkenColor(def.color, 20);
                 
+                // Create color indicator
+                const blockIcon = document.createElement('span');
+                blockIcon.className = 'palette-block-icon';
+                blockIcon.style.backgroundColor = def.color || categoryColor;
+                paletteBlock.appendChild(blockIcon);
+                
+                // Add block text
+                paletteBlock.appendChild(document.createTextNode(def.label));
+                
+                // Set background with subtle gradient based on block color
+                const baseColor = def.color || '#3a4553';
+                paletteBlock.style.background = `linear-gradient(to right, ${baseColor}15, ${baseColor}30)`;
+                
+                // Make drag-and-drop work
                 paletteBlock.draggable = true;
                 paletteBlock.addEventListener('dragstart', (e) => {
                     e.dataTransfer.setData('text/plain', def.type);
                     // Indicate this is a new block being dragged from palette
                     activeDrag = { isNew: true, type: def.type };
+                    
+                    // Add dragging class for styling
+                    paletteBlock.classList.add('dragging');
                 });
+                
+                paletteBlock.addEventListener('dragend', () => {
+                    paletteBlock.classList.remove('dragging');
+                });
+                
                 categoryContent.appendChild(paletteBlock);
             });
             
@@ -364,35 +443,74 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     workspace.addEventListener('drop', (e) => {
-        e.preventDefault();
-        if (activeDrag && activeDrag.isNew) {
-            const type = e.dataTransfer.getData('text/plain');
-            const workspaceRect = workspace.getBoundingClientRect();
-            
-            // Calculate precise drop position using the same coordinate system as dragging
-            const x = (e.clientX - workspaceRect.left) / scale + panX;
-            const y = (e.clientY - workspaceRect.top) / scale + panY;
-            
-            createBlock(type, x, y);
-            
-            // Save state after creating a block
-            saveState();
-        }
-        activeDrag = null;
-    });
+    e.preventDefault();
+    if (activeDrag && activeDrag.isNew) {
+        const type = e.dataTransfer.getData('text/plain') || activeDrag.type;
+        const workspaceRect = workspace.getBoundingClientRect();
+        
+        // These calculations were the source of the issue
+        // We need to directly map screen coordinates to model coordinates
+        
+        // Get mouse position in screen coordinates relative to viewport
+        const mouseScreenX = e.clientX;
+        const mouseScreenY = e.clientY;
+        
+        // Get mouse position relative to workspace's transformed position
+        const relativeX = mouseScreenX - workspaceRect.left;
+        const relativeY = mouseScreenY - workspaceRect.top;
+        
+        // Convert to model coordinates by accounting for transform
+        // This is the proper conversion from screen to model space
+        const modelX = relativeX / scale + panX;
+        const modelY = relativeY / scale + panY;
+        
+        console.log('Drop position:', { 
+            screen: { x: mouseScreenX, y: mouseScreenY },
+            relative: { x: relativeX, y: relativeY },
+            model: { x: modelX, y: modelY },
+            transform: { panX, panY, scale }
+        });
+        
+        // Create the block initially at the exact drop position
+        const block = createBlock(type, modelX, modelY);
+        
+        // Center the block on the cursor after it's created
+        setTimeout(() => {
+            if (block && block.element) {
+                const blockWidth = block.element.offsetWidth;
+                const blockHeight = block.element.offsetHeight;
+                
+                // Adjust position to center the block on the cursor
+                block.element.style.left = `${modelX - blockWidth/2}px`;
+                block.element.style.top = `${modelY - blockHeight/2}px`;
+                
+                updateAllConnectionLines();
+                saveState();
+            }
+        }, 0);
+    }
+    activeDrag = null;
+});
 
     function createBlock(type, x, y) {
         const definition = BLOCK_DEFINITIONS[type];
         if (!definition) return;
 
+        // Additional debugging
+        console.log('Creating block at:', { x, y });
+
         const blockId = `block-${nextBlockId++}`;
         const blockElement = document.createElement('div');
         blockElement.id = blockId;
         blockElement.className = 'script-block';
-        blockElement.style.left = `${x}px`;
-        blockElement.style.top = `${y}px`;
+        
+        // Position the block - ensure these are numbers with px units
+        blockElement.style.left = `${Math.round(x)}px`;
+        blockElement.style.top = `${Math.round(y)}px`;
+        
         blockElement.style.backgroundColor = definition.color || '#60a5fa';
         blockElement.style.borderColor = definition.color ? darkenColor(definition.color, 30) : '#4a5568';
+        
 
         // Add delete button (X) in top right
         const deleteBtn = document.createElement('div');
@@ -640,7 +758,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleDocumentMouseMove(e) {
         if (!isConnecting || !tempLine) return;
         const workspaceRect = workspace.getBoundingClientRect();
-        // Calculate end position accounting for zoom and pan
+        
+        // Calculate end position in SVG coordinates
         const endX = (e.clientX - workspaceRect.left) / scale;
         const endY = (e.clientY - workspaceRect.top) / scale;
 
@@ -648,9 +767,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const pathData = calculateBezierPath(
             startPos.x, startPos.y, 
             endX, endY, 
-            getComputedStyle(connectionStartInfo.connectorElement).getPropertyValue('--connector-direction').trim(), // 'vertical' or 'horizontal'
-            'auto' // For the target, direction is unknown until connection
+            getComputedStyle(connectionStartInfo.connectorElement).getPropertyValue('--connector-direction').trim(),
+            'auto'
         );
+        
         tempLine.setAttribute('d', pathData);
         
         // Ensure workspace size is adequate
@@ -919,16 +1039,26 @@ document.addEventListener('DOMContentLoaded', () => {
         contextMenu.style.top = `${y}px`;
     }
     
-    function showConnectorContextMenu(x, y) {
+    function showConnectionContextMenu(x, y) {
         hideContextMenu(); // Remove any existing menu
+        
+        // Add debug logging
+        console.log("Right-clicked connection ID:", rightClickedConnectionId);
         
         contextMenu = document.createElement('div');
         contextMenu.className = 'context-menu';
         
         const deleteItem = document.createElement('div');
         deleteItem.className = 'context-menu-item danger';
-        deleteItem.textContent = 'Delete All Connections';
-        deleteItem.addEventListener('click', deleteConnectorConnections);
+        deleteItem.textContent = 'Delete Connection';
+        deleteItem.addEventListener('click', () => {
+            // Store the ID locally to make sure it's captured in the closure
+            const connectionIdToDelete = rightClickedConnectionId;
+            console.log("Deleting connection with ID:", connectionIdToDelete);
+            removeConnection(connectionIdToDelete);
+            hideContextMenu();
+            saveState();
+        });
         
         contextMenu.appendChild(deleteItem);
         document.body.appendChild(contextMenu);
@@ -999,14 +1129,33 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Remove connection by ID
     function removeConnection(connectionId) {
+        console.log("Attempting to remove connection:", connectionId);
+        
         const connectionIndex = connections.findIndex(conn => conn.id === connectionId);
-        if (connectionIndex === -1) return;
+        if (connectionIndex === -1) {
+            console.error("Connection not found:", connectionId);
+            return;
+        }
         
         const connection = connections[connectionIndex];
+        console.log("Found connection to remove:", connection);
         
-        // Remove SVG elements
-        if (connection.pathElement) svgLayer.removeChild(connection.pathElement);
-        if (connection.dotElement) svgLayer.removeChild(connection.dotElement);
+        // Remove SVG elements with error checking
+        try {
+            if (connection.pathElement && connection.pathElement.parentNode) {
+                connection.pathElement.parentNode.removeChild(connection.pathElement);
+            } else {
+                console.warn("Path element not found or already removed");
+            }
+            
+            if (connection.dotElement && connection.dotElement.parentNode) {
+                connection.dotElement.parentNode.removeChild(connection.dotElement);
+            } else {
+                console.warn("Dot element not found or already removed");
+            }
+        } catch (error) {
+            console.error("Error removing SVG elements:", error);
+        }
         
         // Update from block connection references
         const fromBlock = blocks.find(b => b.id === connection.fromBlockId);
@@ -1018,10 +1167,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     fromBlock.connections.branch = fromBlock.connections.branch.filter(id => id !== connectionId);
                 }
             } else if (connection.fromConnectorType === 'dataOutput' && 
-                       fromBlock.connections.dataOutputs[connection.fromConnectorName]) {
+                    fromBlock.connections.dataOutputs[connection.fromConnectorName]) {
                 fromBlock.connections.dataOutputs[connection.fromConnectorName] = 
                     fromBlock.connections.dataOutputs[connection.fromConnectorName].filter(id => id !== connectionId);
             }
+        } else {
+            console.warn("Source block not found:", connection.fromBlockId);
         }
         
         // Update to block connection references
@@ -1032,12 +1183,14 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (connection.toConnectorType === 'dataInput') {
                 toBlock.connections.dataInputs[connection.toConnectorName] = null;
             }
+        } else {
+            console.warn("Target block not found:", connection.toBlockId);
         }
         
         // Remove from connections array
         connections.splice(connectionIndex, 1);
         
-        console.log(`Connection ${connectionId} removed`);
+        console.log(`Connection ${connectionId} removed successfully`);
     }
 
     // Enhanced code generation with better formatting
@@ -1431,19 +1584,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Adjusted SVG layer size
     function adjustSvgLayerSize() {
-        // Make sure the SVG layer covers the entire workspace
-        const workspaceStyle = getComputedStyle(workspace);
-        const width = workspaceStyle.minWidth || workspaceStyle.width;
-        const height = workspaceStyle.minHeight || workspaceStyle.height;
+        // Make SVG layer exactly match the workspace size
+        const width = workspace.scrollWidth;
+        const height = workspace.scrollHeight;
         
-        svgLayer.style.minWidth = width;
-        svgLayer.style.minHeight = height;
-        svgLayer.style.width = width;
-        svgLayer.style.height = height;
-        
+        // Set explicit sizes for the SVG layer
         svgLayer.setAttribute('width', width);
         svgLayer.setAttribute('height', height);
-        svgLayer.setAttribute('viewBox', `0 0 ${parseInt(width)} ${parseInt(height)}`);
+        svgLayer.style.width = `${width}px`;
+        svgLayer.style.height = `${height}px`;
     }
 
     // Function to ensure workspace is big enough
@@ -1632,30 +1781,26 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function applyTransform() {
-        // Use a CSS transform matrix for more precise control
-        const matrix = `matrix(${scale}, 0, 0, ${scale}, ${-panX * scale}, ${-panY * scale})`;
+        // Calculate the transform once to ensure consistency
+        const translateX = -panX * scale;
+        const translateY = -panY * scale;
         
-        // Apply the same transformation to both the workspace and SVG layer
+        // Apply transform to both workspace and SVG layer
+        const matrix = `matrix(${scale}, 0, 0, ${scale}, ${translateX}, ${translateY})`;
+        
         workspace.style.transform = matrix;
         workspace.style.transformOrigin = '0 0';
         
         svgLayer.style.transform = matrix;
         svgLayer.style.transformOrigin = '0 0';
         
-        // Reset any additional positioning that might interfere
-        workspace.style.left = '0px';
-        workspace.style.top = '0px';
-        svgLayer.style.left = '0px';
-        svgLayer.style.top = '0px';
-        
-        // Apply grid background transformation
-        workspace.style.backgroundPosition = `${-panX * scale}px ${-panY * scale}px`;
+        // Set grid background to match pan exactly
+        // The key fix: we need to use translateX/Y directly, not panX/Y
+        workspace.style.backgroundPosition = `${translateX}px ${translateY}px`;
         workspace.style.backgroundSize = `${20 * scale}px ${20 * scale}px`;
         
-        // Critical: Force connection line updates *after* transform is applied
-        requestAnimationFrame(() => {
-            updateAllConnectionLines();
-        });
+        // Update connection lines AFTER the browser has a chance to apply the transform
+        updateAfterTransform(); // MODIFIED: Was a direct call to updateAllConnectionLines()
     }
 
     function updateAfterTransform() {
