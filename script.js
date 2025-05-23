@@ -437,10 +437,10 @@ document.addEventListener('DOMContentLoaded', () => {
             categoryHeader.style.backgroundColor = categoryColor;
             categoryHeader.style.color = '#ffffff';
             
-            // Create toggle with correct starting state
+            // Create toggle with correct starting state (always collapsed initially)
             const toggleSpan = document.createElement('span');
             toggleSpan.className = 'category-toggle';
-            toggleSpan.textContent = '▼';
+            toggleSpan.textContent = '►';
             
             categoryHeader.appendChild(toggleSpan);
             categoryHeader.appendChild(document.createTextNode(` ${category}`));
@@ -453,12 +453,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             
             const categoryContent = document.createElement('div');
-            categoryContent.className = 'category-content';
-            // Optional: Start with some categories collapsed
-            if (['Arrays', 'Objects', 'Misc'].includes(category)) {
-                categoryContent.classList.add('collapsed');
-                toggleSpan.textContent = '►';
-            }
+            categoryContent.className = 'category-content collapsed'; // Start all collapsed
             
             // Add blocks to this category
             categories[category].forEach(def => {
@@ -1965,6 +1960,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Call this after initial loading
     setupConnectionObservers();
+
+    // Prevent default scrolling on workspace
+    workspace.addEventListener('wheel', (e) => {
+        // If control key is not pressed, prevent default scrolling, otherwise allow zooming
+        if (!e.ctrlKey) {
+            e.preventDefault();
+        }
+    }
+    );
     
     // Listen for window resize to adjust the SVG layer
     window.addEventListener('resize', adjustSvgLayerSize);
