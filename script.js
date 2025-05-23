@@ -60,22 +60,89 @@ document.addEventListener('DOMContentLoaded', () => {
     function getConnectorPosition(connectorElement) {
         if (!connectorElement) return { x: 0, y: 0 };
         
+        // Cache the workspace rect calculation to avoid repeated DOM queries
+        if (!window._workspaceRect || window._lastTransform !== workspace.style.transform) {
+            window._workspaceRect = workspace.getBoundingClientRect();
+            window._lastTransform = workspace.style.transform;
+        }
+        
         const rect = connectorElement.getBoundingClientRect(); // Connector's screen bounds
-        const workspaceRect = workspace.getBoundingClientRect(); // Transformed workspace's screen bounds
-
+        const workspaceRect = window._workspaceRect; // Use cached version
+        
         // Center of the connector in screen coordinates
         const connectorScreenX = rect.left + rect.width / 2;
         const connectorScreenY = rect.top + rect.height / 2;
-
+        
         // Position of the connector relative to the transformed workspace's top-left corner on screen
         const relativeScreenX = connectorScreenX - workspaceRect.left;
         const relativeScreenY = connectorScreenY - workspaceRect.top;
-
+        
         // Convert back to untransformed workspace (model) coordinates
         const modelX = (relativeScreenX / scale) + panX;
         const modelY = (relativeScreenY / scale) + panY;
         
         return { x: modelX, y: modelY };
+    }
+
+    function calculatePanBoundaries() {
+        // Get block palette width as a hard boundary on the left
+        const blockPaletteWidth = blockPalette.offsetWidth + 20; // Add some margin
+        
+        // Get bounds of all blocks to ensure we don't lose them
+        let minLeft = Infinity;
+        let maxRight = -Infinity;
+        let minTop = Infinity;
+        let maxBottom = -Infinity;
+        
+        blocks.forEach(block => {
+            const left = parseFloat(block.element.style.left) || 0;
+            const top = parseFloat(block.element.style.top) || 0;
+            const width = block.element.offsetWidth;
+            const height = block.element.offsetHeight;
+            
+            minLeft = Math.min(minLeft, left);
+            maxRight = Math.max(maxRight, left + width);
+            minTop = Math.min(minTop, top);
+            maxBottom = Math.max(maxBottom, top + height);
+        });
+        
+        // If no blocks, use reasonable defaults
+        if (minLeft === Infinity) {
+            minLeft = 0;
+            maxRight = 0;
+            minTop = 0;
+            maxBottom = 0;
+        }
+        
+        // Add padding around blocks
+        const padding = 200;
+        
+        // Calculate visible area in workspace coordinates
+        const visibleWidth = workspace.clientWidth / scale;
+        const visibleHeight = workspace.clientHeight / scale;
+        
+        // Calculate boundaries
+        
+        // Left boundary: Ensure workspace doesn't move past the block palette
+        // This sets how far left you can pan (negative means moving content right)
+        const minPanX = -blockPaletteWidth / scale;
+        
+        // Right boundary: Ensure the rightmost block stays visible
+        // Don't limit it if there are no blocks or if they're all within visible area
+        const maxPanX = Math.max(0, maxRight + padding - visibleWidth);
+        
+        // Top boundary: Ensure the topmost block stays visible
+        const minPanY = Math.min(0, minTop - padding);
+        
+        // Bottom boundary: Ensure the bottommost block stays visible
+        const maxPanY = Math.max(0, maxBottom + padding - visibleHeight);
+        
+        return {
+            minX: minPanX,
+            maxX: maxPanX,
+            minY: minPanY,
+            maxY: maxPanY
+        };
     }
 
     function calculateBezierPath(x1, y1, x2, y2, dir1, dir2) {
@@ -457,8 +524,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const relativeY = mouseScreenY - workspaceRect.top;
             
             // Convert to model coordinates accounting for transform
-            const modelX = relativeX / scale + panX;
-            const modelY = relativeY / scale + panY;
+            // FIXED: The calculation needs to divide by scale first, then add pan values
+            const modelX = (relativeX / scale);// + panX;
+            const modelY = (relativeY / scale);// + panY;
             
             // Create a block with the correct type
             const blockDefinition = BLOCK_DEFINITIONS[type];
@@ -1580,15 +1648,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Adjusted SVG layer size
     function adjustSvgLayerSize() {
-        // Make SVG layer exactly match the workspace size
-        const width = workspace.scrollWidth;
-        const height = workspace.scrollHeight;
+        // Make SVG layer slightly larger than the workspace to accommodate panning
+        const width = Math.max(workspace.scrollWidth, workspace.clientWidth * 2);
+        const height = Math.max(workspace.scrollHeight, workspace.clientHeight * 2);
         
         // Set explicit sizes for the SVG layer
         svgLayer.setAttribute('width', width);
         svgLayer.setAttribute('height', height);
         svgLayer.style.width = `${width}px`;
         svgLayer.style.height = `${height}px`;
+        
+        // Set the viewBox to ensure SVG coordinates match workspace coordinates
+        svgLayer.setAttribute('viewBox', `0 0 ${width} ${height}`);
+        
+        // Force connection update after resize
+        updateAllConnectionLines();
     }
 
     // Function to ensure workspace is big enough
@@ -1626,21 +1700,37 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // Make the pan handlers use our improved transform function
+        // Modified mousemove for direct block movement panning
         workspace.addEventListener('mousemove', (e) => {
             if (isPanning) {
                 const dx = e.clientX - lastMouseX;
                 const dy = e.clientY - lastMouseY;
                 
-                // Update pan values, with proper scaling
-                panX -= dx / scale;
-                panY -= dy / scale;
+                // Get the current boundaries
+                const boundaries = calculatePanBoundaries();
                 
+                // Update the mouse position for next movement
                 lastMouseX = e.clientX;
                 lastMouseY = e.clientY;
                 
-                // Apply the transform - this will also update connection lines
-                applyTransform();
+                // Calculate the movement in model coordinates
+                const deltaX = dx / scale;
+                const deltaY = dy / scale;
+                
+                // Move all blocks by this amount
+                blocks.forEach(block => {
+                    // Get current position
+                    const left = parseFloat(block.element.style.left) || 0;
+                    const top = parseFloat(block.element.style.top) || 0;
+                    
+                    // Apply the movement
+                    block.element.style.left = `${left + deltaX}px`;
+                    block.element.style.top = `${top + deltaY}px`;
+                });
+                
+                // Update connections after moving blocks
+                updateAllConnectionLines();
+                
                 e.preventDefault();
             }
         });
@@ -1657,50 +1747,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // Zoom with mouse wheel
-        workspace.addEventListener('wheel', (e) => {
-            /*if (e.ctrlKey) { // Only zoom when Ctrl is pressed
-                e.preventDefault(); // Prevent the default scroll behavior
-                
-                const delta = e.deltaY < 0 ? 1.1 : 0.9; // Zoom in/out factor
-                
-                // Get cursor position relative to workspace
-                const rect = workspace.getBoundingClientRect();
-                const mouseX = e.clientX - rect.left;
-                const mouseY = e.clientY - rect.top;
-                
-                // Calculate cursor position in workspace coordinates
-                const mouseWorkspaceX = mouseX / scale + panX;
-                const mouseWorkspaceY = mouseY / scale + panY;
-                
-                // Apply zoom
-                const newScale = scale * delta;
-                
-                // Limit zoom level
-                if (newScale > 0.1 && newScale < 5) {
-                    scale = newScale;
-                    
-                    // Adjust pan to zoom at cursor position
-                    panX = mouseWorkspaceX - mouseX / scale;
-                    panY = mouseWorkspaceY - mouseY / scale;
-                    
-                    // Apply transform with the new scale and pan values
-                    applyTransform();
-                    
-                    // After zooming, ensure connections are updated
-                    window.requestAnimationFrame(() => {
-                        updateAllConnectionLines();
-                    });
-                    
-                    // Save state after significant zoom changes
-                    if (Math.abs(delta - 1) > 0.05) {
-                        saveState();
-                    }
-                }
-            }*/
-        });
-        
-        // Add zoom buttons to UI
+        // Add zoom buttons to UI (keep this part)
         const controlsContainer = document.createElement('div');
         controlsContainer.id = 'workspace-controls';
         controlsContainer.className = 'workspace-controls';
@@ -1710,7 +1757,7 @@ document.addEventListener('DOMContentLoaded', () => {
         zoomInBtn.title = 'Zoom In';
         zoomInBtn.addEventListener('click', () => {
             scale = Math.min(scale * 1.2, 5);
-            applyTransform();
+            applyZoomOnly();  // Changed to just apply zoom, not transform
             saveState();
         });
         
@@ -1719,7 +1766,7 @@ document.addEventListener('DOMContentLoaded', () => {
         zoomOutBtn.title = 'Zoom Out';
         zoomOutBtn.addEventListener('click', () => {
             scale = Math.max(scale * 0.8, 0.1);
-            applyTransform();
+            applyZoomOnly();  // Changed to just apply zoom, not transform
             saveState();
         });
         
@@ -1728,9 +1775,7 @@ document.addEventListener('DOMContentLoaded', () => {
         resetZoomBtn.title = 'Reset Zoom';
         resetZoomBtn.addEventListener('click', () => {
             scale = 1;
-            panX = 0;
-            panY = 0;
-            applyTransform();
+            applyZoomOnly();  // Changed to just apply zoom
             saveState();
         });
         
@@ -1748,20 +1793,14 @@ document.addEventListener('DOMContentLoaded', () => {
         redoBtn.disabled = true;
         redoBtn.addEventListener('click', redo);
 
-        const resetPositionBtn = document.createElement('button');
-        resetPositionBtn.textContent = '⌂'; // House symbol for "home position"
-        resetPositionBtn.title = 'Reset Position';
-        resetPositionBtn.addEventListener('click', () => {
-            // Reset just the pan position, keep the current zoom
-            panX = 0;
-            panY = 0;
-            applyTransform();
-            saveState();
-        });
+        const centerViewBtn = document.createElement('button');
+        centerViewBtn.textContent = '⌂'; // House symbol
+        centerViewBtn.title = 'Center View';
+        centerViewBtn.addEventListener('click', centerView);
 
-        // Add it to the controls container
+        // Add to controls container
         controlsContainer.appendChild(document.createElement('div')).className = 'divider';
-        controlsContainer.appendChild(resetPositionBtn);
+        controlsContainer.appendChild(centerViewBtn);
         
         controlsContainer.appendChild(undoBtn);
         controlsContainer.appendChild(redoBtn);
@@ -1776,8 +1815,85 @@ document.addEventListener('DOMContentLoaded', () => {
         saveState();
     }
 
+    function applyZoomOnly() {
+        // Apply zoom directly to workspace
+        const matrix = `matrix(${scale}, 0, 0, ${scale}, 0, 0)`;
+        
+        workspace.style.transform = matrix;
+        workspace.style.transformOrigin = '0 0';
+        
+        svgLayer.style.transform = matrix;
+        svgLayer.style.transformOrigin = '0 0';
+        
+        // Update grid background to match scale
+        workspace.style.backgroundSize = `${20 * scale}px ${20 * scale}px`;
+        
+        // Update connection lines AFTER the transform has been applied
+        requestAnimationFrame(() => {
+            updateAllConnectionLines();
+        });
+    }
+
+    function centerView() {
+        if (blocks.length === 0) return;
+        
+        // Calculate average position of all blocks
+        let totalX = 0;
+        let totalY = 0;
+        let minX = Infinity;
+        let maxX = -Infinity;
+        let minY = Infinity;
+        let maxY = -Infinity;
+        
+        blocks.forEach(block => {
+            const left = parseFloat(block.element.style.left) || 0;
+            const top = parseFloat(block.element.style.top) || 0;
+            const width = block.element.offsetWidth;
+            const height = block.element.offsetHeight;
+            
+            totalX += left + width/2;
+            totalY += top + height/2;
+            
+            minX = Math.min(minX, left);
+            maxX = Math.max(maxX, left + width);
+            minY = Math.min(minY, top);
+            maxY = Math.max(maxY, top + height);
+        });
+        
+        const avgX = totalX / blocks.length;
+        const avgY = totalY / blocks.length;
+        
+        // Calculate viewport center
+        const viewportWidth = workspace.clientWidth / scale;
+        const viewportHeight = workspace.clientHeight / scale;
+        const viewportCenterX = viewportWidth / 2;
+        const viewportCenterY = viewportHeight / 2;
+        
+        // Calculate movement needed to center
+        const deltaX = viewportCenterX - avgX;
+        const deltaY = viewportCenterY - avgY;
+        
+        // Move all blocks
+        blocks.forEach(block => {
+            const left = parseFloat(block.element.style.left) || 0;
+            const top = parseFloat(block.element.style.top) || 0;
+            
+            block.element.style.left = `${left + deltaX}px`;
+            block.element.style.top = `${top + deltaY}px`;
+        });
+        
+        // Update connections
+        updateAllConnectionLines();
+        saveState();
+    }
+
     function applyTransform() {
-        // Calculate the transform once to ensure consistency
+        // Apply constraints before setting transform
+        const boundaries = calculatePanBoundaries();
+        panX = Math.max(boundaries.minX, Math.min(boundaries.maxX, panX));
+        panY = Math.max(boundaries.minY, Math.min(boundaries.maxY, panY));
+        
+        // Calculate the transform with constrained values
         const translateX = -panX * scale;
         const translateY = -panY * scale;
         
@@ -1790,8 +1906,8 @@ document.addEventListener('DOMContentLoaded', () => {
         svgLayer.style.transform = matrix;
         svgLayer.style.transformOrigin = '0 0';
         
-        // Set grid background to match pan exactly
-        workspace.style.backgroundPosition = `${translateX}px ${translateY}px`;
+        // Fix: Calculate background position to match pan and scale
+        workspace.style.backgroundPosition = `${-panX * scale % (20 * scale)}px ${-panY * scale % (20 * scale)}px`;
         workspace.style.backgroundSize = `${20 * scale}px ${20 * scale}px`;
         
         // Update connection lines AFTER the transform has been applied
