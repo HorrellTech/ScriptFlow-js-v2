@@ -3,31 +3,191 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ScriptFlow.js - Visual Scripting</title>
-    <link rel="stylesheet" href="style.css">
+    <title>ScriptFlow.js Demo</title>
+    <style>
+        :root {
+            --bg-dark: #1a202c;
+            --bg-darker: #171923;
+            --bg-light: #2d3748;
+            --text-light: #e2e8f0;
+            --text-muted: #a0aec0;
+            --border-color: #4a5568;
+            --primary: #4299e1;
+            --primary-dark: #3182ce;
+            --primary-glow: #81e6d9;
+            --code-bg: #2d3748;
+            --code-text: #90cdf4;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            line-height: 1.6;
+            color: var(--text-light);
+            background-color: var(--bg-darker);
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            transition: background-color 0.3s ease;
+        }
+        
+        h1, h2, h3 {
+            color: var(--primary-glow);
+            font-weight: 600;
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 40px;
+            font-size: 2.5rem;
+            text-shadow: 0 0 10px rgba(129, 230, 217, 0.3);
+        }
+        
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            margin: 10px 0;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        button:hover {
+            background-color: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.15);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        pre {
+            background-color: var(--code-bg);
+            color: var(--code-text);
+            padding: 20px;
+            border-radius: 8px;
+            overflow: auto;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 0.9rem;
+            border: 1px solid var(--border-color);
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.2);
+            line-height: 1.5;
+        }
+        
+        .demo-section {
+            margin-bottom: 40px;
+            padding: 25px;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            background-color: var(--bg-dark);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .demo-section:hover {
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+            transform: translateY(-3px);
+        }
+        
+        a {
+            color: var(--primary);
+            text-decoration: none;
+            border-bottom: 1px dotted var(--primary);
+            transition: color 0.2s ease, border-color 0.2s ease;
+        }
+        
+        a:hover {
+            color: var(--primary-glow);
+            border-color: var(--primary-glow);
+        }
+        
+        /* Logo styling */
+        .logo-container {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .logo {
+            font-size: 2.2rem;
+            font-weight: bold;
+            color: var(--primary-glow);
+            text-shadow: 0 0 10px rgba(129, 230, 217, 0.5);
+            letter-spacing: 1px;
+        }
+        
+        .tagline {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            margin-top: 5px;
+        }
+        
+        /* Footer styling */
+        footer {
+            margin-top: 60px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+        }
+    </style>
 </head>
 <body>
-    <div id="app-container">
-        <div id="block-palette">
-            <h2>Blocks</h2>
-            <!-- Blocks will be populated here by script.js -->
-        </div>
-        <div id="workspace-container">
-            <div id="workspace">
-                <svg id="connection-layer" width="100%" height="100%" style="position: absolute; top: 0; left: 0; 
-                pointer-events: none;"></svg>
-                <!--canvas id="connection-layer-canvas"></canvas--->.
-                <!-- Draggable blocks will appear here -->
-            </div>
-        </div>
-        <div id="code-output-container">
-            <h2>Generated Code</h2>
-            <button id="generate-code-btn">Generate Code</button>
-            <pre id="generated-code">// Code will appear here</pre>
+    <div class="logo-container">
+        <div class="logo">ScriptFlow.js</div>
+        <div class="tagline">Visual Programming for JavaScript</div>
+    </div>
+    
+    <h1>ScriptFlow.js Demonstration</h1>
+    
+    <div class="demo-section">
+        <h2>Modal Version</h2>
+        <p>Click the button below to open ScriptFlow in a modal dialog. This allows you to embed ScriptFlow directly into your existing applications.</p>
+        <button id="open-modal">Open ScriptFlow Modal</button>
+        <div>
+            <h3>Generated Code:</h3>
+            <pre id="modal-output">// Your code will appear here after using the editor</pre>
         </div>
     </div>
-
-    <script src="blocks.js"></script>
-    <script src="script.js"></script>
+    
+    <div class="demo-section">
+        <h2>Standalone Version</h2>
+        <p>For a full-screen experience, you can use ScriptFlow in standalone mode. This gives you more space to work with complex visual programming projects.</p>
+        <p>Click the button below to open ScriptFlow in a new window:</p>
+        <button id="open-standalone">Open Standalone Version</button>
+    </div>
+    
+    <footer>
+        <p>ScriptFlow.js &copy; 2025 | Visual Programming Made Simple</p>
+    </footer>
+    
+    <!-- Load the modal script first -->
+    <script src="scriptflow-modal.js"></script>
+    
+    <script>
+        document.getElementById('open-modal').addEventListener('click', function() {
+            // Create and open a new ScriptFlow modal
+            const modal = new ScriptFlowModal({
+                title: 'ScriptFlow Visual Programming',
+                width: '95%',
+                height: '90%',
+                onSave: function(code) {
+                    // Display the generated code when the user clicks Done
+                    document.getElementById('modal-output').textContent = code;
+                }
+            });
+            
+            modal.open();
+        });
+        
+        document.getElementById('open-standalone').addEventListener('click', function() {
+            window.open('editor.html', '_blank');
+        });
+    </script>
 </body>
 </html>

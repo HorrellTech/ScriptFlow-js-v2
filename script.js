@@ -1,5 +1,8 @@
 document.addEventListener('DOMContentLoaded', () => {
-// Create and insert toolbar before the app container
+     // Check if we're running in modal mode
+    const isModalMode = window.SCRIPTFLOW_MODAL_MODE === true;
+    
+    // Create and insert toolbar before the app container
     const appContainer = document.getElementById('app-container');
     
     // Create toolbar
@@ -413,6 +416,39 @@ document.addEventListener('DOMContentLoaded', () => {
         // Convert to JSON string
         const jsonData = JSON.stringify(projectData, null, 2);
         
+        // Use the FileSaver API if available in modern browsers
+        if (window.showSaveFilePicker) {
+            saveWithFilePicker(jsonData);
+        } else {
+            // Fallback to traditional download method
+            saveWithDownloadLink(jsonData);
+        }
+    }
+
+    async function saveWithFilePicker(jsonData) {
+        try {
+            const opts = {
+                types: [{
+                    description: 'ScriptFlow Project File',
+                    accept: {'application/json': ['.json']}
+                }],
+                suggestedName: 'scriptflow-project.json'
+            };
+            
+            const fileHandle = await window.showSaveFilePicker(opts);
+            const writable = await fileHandle.createWritable();
+            await writable.write(jsonData);
+            await writable.close();
+            
+            console.log('File saved successfully using File System Access API');
+        } catch (err) {
+            console.error('Error saving file with File System Access API:', err);
+            // Fall back to the download link method if the File System Access API fails
+            saveWithDownloadLink(jsonData);
+        }
+    }
+    
+    function saveWithDownloadLink(jsonData) {
         // Create a download link
         const blob = new Blob([jsonData], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
@@ -428,8 +464,41 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     function openProject() {
-        // Trigger the hidden file input
-        document.getElementById('file-input').click();
+        // Check if File System Access API is available
+        if (window.showOpenFilePicker) {
+            openWithFilePicker();
+        } else {
+            // Fallback to traditional file input
+            document.getElementById('file-input').click();
+        }
+    }
+
+    async function openWithFilePicker() {
+        try {
+            // Define accepted file types
+            const pickerOpts = {
+                types: [{
+                    description: 'ScriptFlow Project Files',
+                    accept: {'application/json': ['.json']}
+                }],
+                multiple: false
+            };
+            
+            // Show the file picker
+            const [fileHandle] = await window.showOpenFilePicker(pickerOpts);
+            const file = await fileHandle.getFile();
+            const contents = await file.text();
+            
+            // Process the file contents
+            processProjectFile(contents);
+            
+        } catch (err) {
+            console.error('Error opening file with File System Access API:', err);
+            // If user canceled or API failed, do nothing or show a message
+            if (err.name !== 'AbortError') {
+                alert('Error opening file. Please try again or use the Open button.');
+            }
+        }
     }
     
     function handleFileSelect(event) {
@@ -447,75 +516,86 @@ document.addEventListener('DOMContentLoaded', () => {
         const reader = new FileReader();
         reader.onload = function(e) {
             try {
-                const projectData = JSON.parse(e.target.result);
+                // Process the file contents
+                processProjectFile(e.target.result);
+            } catch (error) {
+                console.error("Error reading project file:", error);
+                alert("Error reading project file. The file may be corrupted or in an incompatible format.");
+            }
+            
+            // Reset the file input for future use
+            event.target.value = '';
+        };
+        
+        reader.readAsText(file);
+    }
+
+    function processProjectFile(fileContents) {
+        try {
+            const projectData = JSON.parse(fileContents);
+            
+            // Version check for compatibility
+            if (!projectData.version) {
+                alert('Warning: This project was created with an older version of ScriptFlow.');
+            }
+            
+            // Clear current project
+            createNewProject();
+            
+            // Load the project data
+            if (projectData.viewSettings) {
+                scale = projectData.viewSettings.scale || 1;
+                panX = projectData.viewSettings.panX || 0;
+                panY = projectData.viewSettings.panY || 0;
+                applyZoomOnly();
+            }
+            
+            // Set next IDs
+            nextBlockId = projectData.nextBlockId || 0;
+            nextConnectionId = projectData.nextConnectionId || 0;
+            
+            // Create blocks
+            projectData.blocks.forEach(blockData => {
+                const left = parseFloat(blockData.position.left) || 0;
+                const top = parseFloat(blockData.position.top) || 0;
                 
-                // Version check for compatibility
-                if (!projectData.version) {
-                    alert('Warning: This project was created with an older version of ScriptFlow.');
-                }
+                const block = createBlock(blockData.type, left, top);
                 
-                // Clear current project
-                createNewProject();
-                
-                // Load the project data
-                if (projectData.viewSettings) {
-                    scale = projectData.viewSettings.scale || 1;
-                    panX = projectData.viewSettings.panX || 0;
-                    panY = projectData.viewSettings.panY || 0;
-                    applyZoomOnly();
-                }
-                
-                // Set next IDs
-                nextBlockId = projectData.nextBlockId || 0;
-                nextConnectionId = projectData.nextConnectionId || 0;
-                
-                // Create blocks
-                projectData.blocks.forEach(blockData => {
-                    const left = parseFloat(blockData.position.left) || 0;
-                    const top = parseFloat(blockData.position.top) || 0;
+                // Restore block data
+                if (block) {
+                    block.data = {...blockData.data};
                     
-                    const block = createBlock(blockData.type, left, top);
-                    
-                    // Restore block data
-                    if (block) {
-                        block.data = {...blockData.data};
-                        
-                        // Update the input fields with the data
-                        const inputFields = block.element.querySelectorAll('input, textarea, select');
-                        inputFields.forEach(input => {
-                            const inputName = input.dataset.inputName;
-                            if (inputName && blockData.data[inputName] !== undefined) {
-                                if (input.type === 'checkbox') {
-                                    input.checked = blockData.data[inputName];
-                                } else {
-                                    input.value = blockData.data[inputName];
-                                }
+                    // Update the input fields with the data
+                    const inputFields = block.element.querySelectorAll('input, textarea, select');
+                    inputFields.forEach(input => {
+                        const inputName = input.dataset.inputName;
+                        if (inputName && blockData.data[inputName] !== undefined) {
+                            if (input.type === 'checkbox') {
+                                input.checked = blockData.data[inputName];
+                            } else {
+                                input.value = blockData.data[inputName];
                             }
-                        });
-                        
-                        // Restore connection references
-                        block.connections = JSON.parse(JSON.stringify(blockData.connections));
-                    }
-                });
-                
-                // Create connections
+                        }
+                    });
+                    
+                    // Restore connection references
+                    block.connections = JSON.parse(JSON.stringify(blockData.connections));
+                }
+            });
+            
+            // Create connections
+            if (projectData.connections && Array.isArray(projectData.connections)) {
                 projectData.connections.forEach(connData => {
                     const fromBlock = blocks.find(b => b.id === connData.fromBlockId);
                     const toBlock = blocks.find(b => b.id === connData.toBlockId);
                     
                     if (fromBlock && toBlock) {
-                        // Find connector elements
-                        const fromConnector = [...fromBlock.element.querySelectorAll('.connector')].find(c => 
-                            c.dataset.blockId === connData.fromBlockId &&
-                            c.dataset.connectorType === connData.fromConnectorType &&
-                            c.dataset.connectorName === connData.fromConnectorName
-                        );
+                        // Find connector elements - use querySelector to ensure we get the exact element
+                        const fromConnectorSelector = `.connector[data-block-id="${connData.fromBlockId}"][data-connector-type="${connData.fromConnectorType}"][data-connector-name="${connData.fromConnectorName}"]`;
+                        const toConnectorSelector = `.connector[data-block-id="${connData.toBlockId}"][data-connector-type="${connData.toConnectorType}"][data-connector-name="${connData.toConnectorName}"]`;
                         
-                        const toConnector = [...toBlock.element.querySelectorAll('.connector')].find(c => 
-                            c.dataset.blockId === connData.toBlockId &&
-                            c.dataset.connectorType === connData.toConnectorType &&
-                            c.dataset.connectorName === connData.toConnectorName
-                        );
+                        const fromConnector = fromBlock.element.querySelector(fromConnectorSelector);
+                        const toConnector = toBlock.element.querySelector(toConnectorSelector);
                         
                         if (fromConnector && toConnector) {
                             createConnection(
@@ -532,23 +612,25 @@ document.addEventListener('DOMContentLoaded', () => {
                                     connectorName: connData.toConnectorName 
                                 }
                             );
+                        } else {
+                            console.warn("Could not find connector elements for connection:", connData);
                         }
+                    } else {
+                        console.warn("Could not find blocks for connection:", connData);
                     }
                 });
-                
-                // Save initial state for undo/redo
-                saveState();
-                
-            } catch (error) {
-                console.error("Error loading project:", error);
-                alert("Error loading project file. The file may be corrupted or in an incompatible format.");
             }
             
-            // Reset the file input for future use
-            event.target.value = '';
-        };
-        
-        reader.readAsText(file);
+            // Force update of all connections to ensure proper rendering
+            updateAllConnectionLines();
+            
+            // Save initial state for undo/redo
+            saveState();
+            
+        } catch (error) {
+            console.error("Error loading project:", error);
+            alert("Error loading project file. The file may be corrupted or in an incompatible format.");
+        }
     }
     
     function showTutorial() {

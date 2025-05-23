@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ScriptFlow.js Editor</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        :root {
+            --bg-dark: #1a202c;
+            --bg-darker: #171923;
+            --bg-light: #2d3748;
+            --text-light: #e2e8f0;
+            --text-muted: #a0aec0;
+            --border-color: #4a5568;
+            --primary: #4299e1;
+            --primary-dark: #3182ce;
+            --primary-glow: #81e6d9;
+            --code-bg: #2d3748;
+            --code-text: #90cdf4;
+        }
+        
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            background-color: var(--bg-darker);
+            color: var(--text-light);
+            overflow: hidden;
+            height: 100vh;
+        }
+        
+        #header {
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        #header .logo {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: var(--primary-glow);
+            text-shadow: 0 0 10px rgba(129, 230, 217, 0.5);
+        }
+        
+        #header .close-button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+        }
+        
+        #header .close-button:hover {
+            background-color: var(--primary-dark);
+        }
+        
+        #app-container {
+            display: flex;
+            flex-direction: row;
+            height: calc(100vh - 50px); /* Adjust for header height */
+        }
+        
+        /* Tutorial tooltip styling */
+        .tutorial-tooltip {
+            position: fixed;
+            z-index: 1000;
+            background-color: var(--bg-dark);
+            border: 1px solid var(--primary);
+            border-radius: 6px;
+            padding: 15px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            max-width: 300px;
+            pointer-events: auto;
+        }
+        
+        .tooltip-content p {
+            margin: 0 0 12px 0;
+            color: var(--text-light);
+        }
+        
+        .tooltip-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .tooltip-buttons button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .tooltip-buttons button:hover {
+            background-color: var(--primary-dark);
+        }
+        
+        .tooltip-arrow {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: var(--bg-dark);
+            transform: rotate(45deg);
+            border: 1px solid var(--primary);
+        }
+        
+        .tooltip-top .tooltip-arrow {
+            bottom: -6px;
+            left: 50%;
+            margin-left: -6px;
+            border-top: none;
+            border-left: none;
+        }
+        
+        .tooltip-bottom .tooltip-arrow {
+            top: -6px;
+            left: 50%;
+            margin-left: -6px;
+            border-bottom: none;
+            border-right: none;
+        }
+        
+        .tooltip-left .tooltip-arrow {
+            right: -6px;
+            top: 50%;
+            margin-top: -6px;
+            border-bottom: none;
+            border-left: none;
+        }
+        
+        .tooltip-right .tooltip-arrow {
+            left: -6px;
+            top: 50%;
+            margin-top: -6px;
+            border-top: none;
+            border-right: none;
+        }
+        
+        .skip-tutorial-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+            background-color: var(--bg-light);
+            color: var(--text-light);
+            border: 1px solid var(--border-color);
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .skip-tutorial-btn:hover {
+            background-color: var(--primary);
+        }
+        
+        .tutorial-highlight {
+            position: relative;
+            z-index: 999;
+            box-shadow: 0 0 0 2px var(--primary), 0 0 15px rgba(66, 153, 225, 0.6);
+            border-radius: 4px;
+        }
+        
+        .connector-highlight {
+            position: relative;
+            z-index: 999;
+            box-shadow: 0 0 0 2px var(--primary-glow), 0 0 15px rgba(129, 230, 217, 0.8);
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 2px var(--primary-glow), 0 0 15px rgba(129, 230, 217, 0.8); }
+            50% { box-shadow: 0 0 0 3px var(--primary-glow), 0 0 20px rgba(129, 230, 217, 1); }
+            100% { box-shadow: 0 0 0 2px var(--primary-glow), 0 0 15px rgba(129, 230, 217, 0.8); }
+        }
+        
+        /* Context menu styling */
+        .context-menu {
+            position: fixed;
+            z-index: 1000;
+            background-color: var(--bg-dark);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            min-width: 150px;
+        }
+        
+        .context-menu-item {
+            padding: 8px 15px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .context-menu-item:hover {
+            background-color: var(--bg-light);
+        }
+        
+        .context-menu-item.danger {
+            color: #FC8181;
+        }
+        
+        .context-menu-item.danger:hover {
+            background-color: rgba(252, 129, 129, 0.1);
+        }
+    </style>
+
+    <script>
+        // Add message listener to communicate with the parent window
+        window.addEventListener('message', function(event) {
+            // Check for getGeneratedCode request
+            if (event.data && event.data.action === 'getGeneratedCode') {
+                // Get the generated code from the code area
+                const generatedCode = document.getElementById('generated-code').textContent;
+                
+                // Send it back to the parent window
+                window.parent.postMessage({
+                    action: 'generatedCode',
+                    code: generatedCode
+                }, '*');
+            }
+        });
+    </script>
+</head>
+<body>
+    <div id="header">
+        <div class="logo">ScriptFlow.js Editor</div>
+        <button class="close-button" onclick="window.close()">Close Editor</button>
+    </div>
+    
+    <div id="app-container">
+        <div id="block-palette">
+            <h2>Blocks</h2>
+            <!-- Block categories will be generated by script.js -->
+        </div>
+        
+        <div id="workspace-container">
+            <div id="workspace">
+                <svg id="connection-layer" width="100%" height="100%" style="position: absolute; top: 0; left: 0; pointer-events: none;"></svg>
+            </div>
+        </div>
+        
+        <div id="code-output-container">
+            <h2>Generated Code</h2>
+            <button id="generate-code-btn">Generate Code</button>
+            <pre id="generated-code">// Code will appear here</pre>
+        </div>
+    </div>
+    
+    <!-- Load the required scripts -->
+    <script src="blocks.js"></script>
+    <script src="script.js"></script>
+
+    <script>
+        // When clicking the Generate Code button, automatically send the code to parent window if in an iframe
+        document.addEventListener('DOMContentLoaded', function() {
+            const generateBtn = document.getElementById('generate-code-btn');
+            if (generateBtn) {
+                // Store the original click handler
+                const originalClickHandler = generateBtn.onclick;
+                
+                // Add a new click handler that also sends the code to parent
+                generateBtn.addEventListener('click', function() {
+                    // Wait a moment for the code to be generated
+                    setTimeout(function() {
+                        // Only send if we're in an iframe
+                        if (window.parent !== window) {
+                            const generatedCode = document.getElementById('generated-code').textContent;
+                            window.parent.postMessage({
+                                action: 'generatedCode',
+                                code: generatedCode
+                            }, '*');
+                        }
+                    }, 100);
+                });
+            }
+            
+            // Modify the close button to communicate with parent window
+            const closeBtn = document.querySelector('.close-button');
+            if (closeBtn) {
+                closeBtn.addEventListener('click', function(e) {
+                    // If we're in an iframe, tell the parent window we want to close
+                    if (window.parent !== window) {
+                        e.preventDefault();
+                        
+                        // Get the generated code
+                        const generatedCode = document.getElementById('generated-code').textContent;
+                        
+                        // Send it to the parent
+                        window.parent.postMessage({
+                            action: 'generatedCode',
+                            code: generatedCode
+                        }, '*');
+                        
+                        return false;
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>
