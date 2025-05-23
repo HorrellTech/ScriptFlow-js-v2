@@ -664,18 +664,19 @@ document.addEventListener('DOMContentLoaded', () => {
             el.classList.remove('tutorial-highlight');
         });
         
-        // Update palette blocks with data-attributes for targeting
-        const paletteBlocks = document.querySelectorAll('.palette-block');
-        paletteBlocks.forEach(block => {
-            const text = block.textContent.trim();
-            block.setAttribute('data-block-type', text.toLowerCase().replace(/\s+/g, '_'));
+        document.querySelectorAll('.connector-highlight').forEach(el => {
+            el.classList.remove('connector-highlight');
         });
         
-        // Start with first step
-        showTutorialStep(0);
+        // Make sure palette blocks have proper data attributes for targeting
+        updatePaletteBlocksForTutorial();
         
-        // Automatically expand Flow Control category for the first step
+        // Wait a moment to ensure DOM is ready
         setTimeout(() => {
+            // Start with first step
+            showTutorialStep(0);
+            
+            // Automatically expand Flow Control category for the first step
             const flowControlCategory = document.querySelector('.category-flow-control');
             if (flowControlCategory) {
                 const header = flowControlCategory.querySelector('.category-header');
@@ -683,7 +684,21 @@ document.addEventListener('DOMContentLoaded', () => {
                     header.click();
                 }
             }
-        }, 1000);
+        }, 200);
+    }
+
+    // Helper to ensure palette blocks have the right data attributes
+    function updatePaletteBlocksForTutorial() {
+        // Add data-block-type attributes to palette blocks for targeting in tutorial
+        const paletteBlocks = document.querySelectorAll('.palette-block');
+        paletteBlocks.forEach(block => {
+            const blockText = block.textContent.trim();
+            const blockType = blockText.toLowerCase().replace(/\s+/g, '_');
+            block.setAttribute('data-block-type', blockType);
+            
+            // Log for debugging
+            console.log(`Set palette block data-block-type: ${blockType}`);
+        });
     }
 
     // Define helper functions that are used throughout
@@ -1015,6 +1030,111 @@ document.addEventListener('DOMContentLoaded', () => {
         return connector;
     }
 
+    function createAndPositionTooltip(targetEl, step) {
+        // Create tooltip
+        tutorialTooltip = document.createElement('div');
+        tutorialTooltip.className = `tutorial-tooltip tooltip-${step.position}`;
+        tutorialTooltip.innerHTML = `
+            <div class="tooltip-arrow"></div>
+            <div class="tooltip-content">
+                <p>${step.message}</p>
+                <div class="tooltip-buttons">
+                    <button class="next-btn">${step.autoAdvance === false ? 'Done' : 'Next'}</button>
+                </div>
+            </div>
+        `;
+        
+        // Add tooltip styles if they don't exist
+        if (!document.getElementById('tutorial-styles')) {
+            const tutorialStyles = document.createElement('style');
+            tutorialStyles.id = 'tutorial-styles';
+            tutorialStyles.textContent = `
+                .tutorial-tooltip {
+                    position: fixed;
+                    z-index: 1000;
+                    background: #1a202c;
+                    color: white;
+                    padding: 12px 15px;
+                    border-radius: 6px;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                    max-width: 300px;
+                    font-size: 14px;
+                    pointer-events: auto;
+                    border: 1px solid #4299e1;
+                }
+                .tutorial-highlight {
+                    position: relative;
+                    z-index: 999;
+                    box-shadow: 0 0 0 4px #4299e1, 0 0 0 8px rgba(66, 153, 225, 0.3);
+                    border-radius: 4px;
+                }
+                .connector-highlight {
+                    box-shadow: 0 0 0 3px rgba(255, 255, 120, 0.7);
+                }
+                .tooltip-content {
+                    line-height: 1.4;
+                }
+                .tooltip-buttons {
+                    display: flex;
+                    justify-content: flex-end;
+                    margin-top: 10px;
+                }
+                .tooltip-buttons button {
+                    background: #4299e1;
+                    color: white;
+                    border: none;
+                    padding: 5px 12px;
+                    border-radius: 4px;
+                    cursor: pointer;
+                }
+                .tooltip-buttons button:hover {
+                    background: #3182ce;
+                }
+                .skip-tutorial-btn {
+                    position: fixed;
+                    bottom: 15px;
+                    right: 15px;
+                    background: #4a5568;
+                    color: white;
+                    border: none;
+                    padding: 8px 15px;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    z-index: 1001;
+                }
+                .skip-tutorial-btn:hover {
+                    background: #2d3748;
+                }
+            `;
+            document.head.appendChild(tutorialStyles);
+        }
+        
+        // Position tooltip relative to target
+        document.body.appendChild(tutorialTooltip);
+        positionTooltip(tutorialTooltip, targetEl, step.position);
+        
+        // Highlight target
+        targetEl.classList.add('tutorial-highlight');
+        
+        // Add button event listeners
+        tutorialTooltip.querySelector('.next-btn').addEventListener('click', () => {
+            targetEl.classList.remove('tutorial-highlight');
+            if (step.autoAdvance !== false) {
+                showTutorialStep(tutorialStep + 1);
+            }
+        });
+        
+        // Special case: highlight connectors if needed
+        if (step.highlightConnectors) {
+            document.querySelectorAll('.connector').forEach(connector => {
+                connector.classList.add('connector-highlight');
+            });
+        }
+        
+        // Add event listeners for auto-advancing based on user actions
+        setupTutorialStepListeners(targetEl, step, tutorialStep);
+    }
+
     // Create collapsible block categories in the palette
     function populateBlockPalette() {
         blockPalette.innerHTML = '<h2>Blocks</h2>';
@@ -1151,15 +1271,11 @@ document.addEventListener('DOMContentLoaded', () => {
         skipBtn.addEventListener('click', endTutorial);
         document.body.appendChild(skipBtn);
         
+        // Update palette blocks for targeting
+        updatePaletteBlocksForTutorial();
+        
         // Start the tutorial
         showTutorialStep(0);
-        
-        // Add data-block-type attributes to palette blocks for targeting in tutorial
-        const paletteBlocks = document.querySelectorAll('.palette-block');
-        paletteBlocks.forEach(block => {
-            const text = block.textContent.trim();
-            block.setAttribute('data-block-type', text.toLowerCase().replace(/\s+/g, '_'));
-        });
         
         // Automatically expand Flow Control category for the first step
         setTimeout(() => {
@@ -1170,7 +1286,54 @@ document.addEventListener('DOMContentLoaded', () => {
                     header.click();
                 }
             }
-        }, 1000);
+        }, 500);
+    }
+
+    function expandCategoryForStep(step) {
+        // For category-related steps, ensure the category is expanded if needed
+        if (step.target.includes('category-') && !step.target.includes('category-content')) {
+            const categoryContainer = document.querySelector(step.target);
+            if (categoryContainer) {
+                const categoryContent = categoryContainer.querySelector('.category-content');
+                if (categoryContent && categoryContent.classList.contains('collapsed')) {
+                    const header = categoryContainer.querySelector('.category-header');
+                    if (header) {
+                        console.log(`Automatically expanding category for tutorial step`);
+                        header.click();
+                    }
+                }
+            }
+        }
+        
+        // For specific block types inside a category, make sure the category is expanded
+        if (step.target.includes('data-block-type')) {
+            // Extract the block type
+            const blockTypeMatch = step.target.match(/data-block-type="([^"]+)"/);
+            if (blockTypeMatch && blockTypeMatch[1]) {
+                const blockType = blockTypeMatch[1];
+                
+                // Find which category contains this block
+                const blockDef = Object.values(BLOCK_DEFINITIONS).find(def => 
+                    def.type === blockType || 
+                    def.label.toLowerCase().replace(/\s+/g, '_') === blockType);
+                    
+                if (blockDef && blockDef.category) {
+                    const categorySlug = blockDef.category.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+                    const categoryContainer = document.querySelector(`.category-${categorySlug}`);
+                    
+                    if (categoryContainer) {
+                        const categoryContent = categoryContainer.querySelector('.category-content');
+                        if (categoryContent && categoryContent.classList.contains('collapsed')) {
+                            const header = categoryContainer.querySelector('.category-header');
+                            if (header) {
+                                console.log(`Expanding category ${blockDef.category} for block type ${blockType}`);
+                                header.click();
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
     
     function showTutorialStep(stepIndex) {
@@ -1192,50 +1355,41 @@ document.addEventListener('DOMContentLoaded', () => {
             el.classList.remove('tutorial-highlight');
         });
         
-        // Find target element
-        const targetEl = document.querySelector(step.target);
+        document.querySelectorAll('.connector-highlight').forEach(el => {
+            el.classList.remove('connector-highlight');
+        });
+        
+        console.log(`Tutorial step ${stepIndex}: Targeting ${step.target}`);
+        
+        // Expand categories if needed based on the step
+        if (step.target.includes('category')) {
+            expandCategoryForStep(step);
+        }
+        
+        // Find target element with retry mechanism
+        let targetEl = document.querySelector(step.target);
+        
+        // If not found immediately, try with a delay (helps with dynamic elements)
         if (!targetEl) {
-            console.warn(`Tutorial target not found: ${step.target}`);
-            showTutorialStep(stepIndex + 1);
+            console.log(`Target ${step.target} not found immediately, will retry...`);
+            setTimeout(() => {
+                let retryTarget = document.querySelector(step.target);
+                if (retryTarget) {
+                    console.log(`Target ${step.target} found on retry`);
+                    createAndPositionTooltip(retryTarget, step);
+                } else {
+                    console.warn(`Tutorial target still not found even after retry: ${step.target}`);
+                    // Move to next step after a short delay if target cannot be found
+                    setTimeout(() => showTutorialStep(stepIndex + 1), 1000);
+                }
+            }, 500);
             return;
         }
         
-        // Create tooltip
-        tutorialTooltip = document.createElement('div');
-        tutorialTooltip.className = `tutorial-tooltip tooltip-${step.position}`;
-        tutorialTooltip.innerHTML = `
-            <div class="tooltip-arrow"></div>
-            <div class="tooltip-content">
-                <p>${step.message}</p>
-                <div class="tooltip-buttons">
-                    <button class="next-btn">${step.autoAdvance === false ? 'Done' : 'Next'}</button>
-                </div>
-            </div>
-        `;
-        
-        // Position tooltip relative to target
-        document.body.appendChild(tutorialTooltip);
-        positionTooltip(tutorialTooltip, targetEl, step.position);
-        
-        // Highlight target
-        targetEl.classList.add('tutorial-highlight');
-        
-        // Add button event listeners
-        tutorialTooltip.querySelector('.next-btn').addEventListener('click', () => {
-            targetEl.classList.remove('tutorial-highlight');
-            if (step.autoAdvance !== false) {
-                showTutorialStep(stepIndex + 1);
-            }
-        });
-        
-        // Special case: highlight connectors if needed
-        if (step.highlightConnectors) {
-            document.querySelectorAll('.connector').forEach(connector => {
-                connector.classList.add('connector-highlight');
-            });
-        }
-        
-        // Add event listeners for auto-advancing based on user actions
+        createAndPositionTooltip(targetEl, step);
+    }
+
+    function setupTutorialStepListeners(targetEl, step, stepIndex) {
         if (step.waitForBlock) {
             // For generic block waiting
             if (typeof step.waitForBlock === 'boolean') {
