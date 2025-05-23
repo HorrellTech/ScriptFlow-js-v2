@@ -1,4 +1,136 @@
 document.addEventListener('DOMContentLoaded', () => {
+// Create and insert toolbar before the app container
+    const appContainer = document.getElementById('app-container');
+    
+    // Create toolbar
+    const toolbar = document.createElement('div');
+    toolbar.id = 'toolbar';
+    toolbar.className = 'toolbar';
+    
+    // Add logo
+    const logo = document.createElement('div');
+    logo.className = 'logo';
+    logo.textContent = 'ScriptFlow.js';
+    toolbar.appendChild(logo);
+    
+    // Create toolbar buttons container
+    const buttonContainer = document.createElement('div');
+    buttonContainer.className = 'toolbar-buttons';
+    
+    // New Project button
+    const newProjectBtn = document.createElement('button');
+    newProjectBtn.id = 'new-project-btn';
+    newProjectBtn.textContent = 'New';
+    newProjectBtn.title = 'New Project';
+    newProjectBtn.addEventListener('click', createNewProject);
+    buttonContainer.appendChild(newProjectBtn);
+    
+    // Save Project button
+    const saveProjectBtn = document.createElement('button');
+    saveProjectBtn.id = 'save-project-btn';
+    saveProjectBtn.textContent = 'Save';
+    saveProjectBtn.title = 'Save Project';
+    saveProjectBtn.addEventListener('click', saveProject);
+    buttonContainer.appendChild(saveProjectBtn);
+    
+    // Open Project button
+    const openProjectBtn = document.createElement('button');
+    openProjectBtn.id = 'open-project-btn';
+    openProjectBtn.textContent = 'Open';
+    openProjectBtn.title = 'Open Project';
+    openProjectBtn.addEventListener('click', openProject);
+    buttonContainer.appendChild(openProjectBtn);
+    
+    // Hidden file input for opening projects
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.id = 'file-input';
+    fileInput.accept = '.json';
+    fileInput.style.display = 'none';
+    fileInput.addEventListener('change', handleFileSelect);
+    buttonContainer.appendChild(fileInput);
+    
+    toolbar.appendChild(buttonContainer);
+    
+    // Create right-side toolbar section
+    const toolbarRight = document.createElement('div');
+    toolbarRight.className = 'toolbar-right';
+    
+    // Tutorial button
+    const tutorialBtn = document.createElement('button');
+    tutorialBtn.id = 'show-tutorial-btn';
+    tutorialBtn.textContent = 'Tutorial';
+    tutorialBtn.title = 'Show Tutorial';
+    tutorialBtn.addEventListener('click', showTutorial);
+    toolbarRight.appendChild(tutorialBtn);
+    
+    toolbar.appendChild(toolbarRight);
+    
+    // Insert toolbar before app container
+    document.body.insertBefore(toolbar, appContainer);
+    
+    // Add CSS for toolbar directly via JS
+    const style = document.createElement('style');
+    style.textContent = `
+        /* Top Toolbar */
+        #toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #1a202c;
+            padding: 10px 15px;
+            border-bottom: 1px solid #4a5568;
+            color: #e2e8f0;
+        }
+        
+        .logo {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #81e6d9;
+            text-shadow: 0 0 10px rgba(129, 230, 217, 0.5);
+        }
+        
+        .toolbar-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .toolbar-right {
+            display: flex;
+            gap: 10px;
+        }
+        
+        #toolbar button {
+            background-color: #2d3748;
+            color: #e2e8f0;
+            border: 1px solid #4a5568;
+            border-radius: 4px;
+            padding: 6px 12px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+        
+        #toolbar button:hover {
+            background-color: #4a5568;
+        }
+        
+        #show-tutorial-btn {
+            background-color: #4299e1;
+            border-color: #3182ce;
+        }
+        
+        #show-tutorial-btn:hover {
+            background-color: #3182ce;
+        }
+        
+        /* Ensure app container takes remaining height */
+        #app-container {
+            height: calc(100vh - 51px); /* Subtract toolbar height + border */
+        }
+    `;
+    document.head.appendChild(style);
+
     const workspace = document.getElementById('workspace');
     const blockPalette = document.getElementById('block-palette');
     const generateCodeBtn = document.getElementById('generate-code-btn');
@@ -37,11 +169,440 @@ document.addEventListener('DOMContentLoaded', () => {
     let lastMouseX = 0;
     let lastMouseY = 0;
 
+    // Tutorial mode variables
+    let tutorialMode = localStorage.getItem('tutorialCompleted') !== 'true';
+    let tutorialStep = 0;
+    let tutorialTooltip = null;
+    const tutorialSteps = [
+        {
+            target: '.category-flow-control',
+            message: 'Welcome to ScriptFlow! Let\'s start by clicking on "Flow Control" to expand blocks',
+            position: 'right'
+        },
+        {
+            target: '[data-block-type="start"]',
+            message: 'Drag a "Start" block to the workspace - this is the entry point of your program',
+            position: 'right'
+        },
+        {
+            target: '.category-objects',
+            message: 'Now click on "Objects" to see object-oriented programming blocks',
+            position: 'right',
+            waitForAction: element => element.querySelector('.category-content.collapsed') !== null,
+            autoAdvance: false
+        },
+        {
+            target: '[data-block-type="class_definition"]',
+            message: 'Drag a "Class" block to the workspace - we\'ll build a simple class',
+            position: 'right',
+            waitForBlock: block => block.type === 'class_definition'
+        },
+        {
+            target: '.connector-parent',
+            message: 'Connect the Start block to the Class block by dragging from the Start block\'s output connector to the Class block\'s input connector',
+            position: 'right',
+            waitForConnection: true,
+            highlightConnectors: true
+        },
+        {
+            target: '[data-block-type="class_definition"] input',
+            message: 'Type a name for your class (e.g. "Calculator")',
+            position: 'bottom',
+            waitForAction: element => {
+                const classBlock = blocks.find(b => b.type === 'class_definition');
+                return classBlock && classBlock.data.class_name && classBlock.data.class_name.length > 0;
+            }
+        },
+        {
+            target: '.category-functions',
+            message: 'Click on "Functions" to see function-related blocks',
+            position: 'right',
+            waitForAction: element => element.querySelector('.category-content.collapsed') !== null,
+            autoAdvance: false
+        },
+        {
+            target: '[data-block-type="function_definition"]',
+            message: 'Drag a "Function" block to the workspace - this will be a method in our class',
+            position: 'right',
+            waitForBlock: block => block.type === 'function_definition'
+        },
+        {
+            target: '.connector-parent',
+            message: 'Connect the Class block\'s output connector to the Function block\'s input connector',
+            position: 'right',
+            waitForConnection: conn => {
+                const fromBlock = blocks.find(b => b.id === conn.fromBlockId);
+                const toBlock = blocks.find(b => b.id === conn.toBlockId);
+                return fromBlock && toBlock && 
+                       fromBlock.type === 'class_definition' && 
+                       toBlock.type === 'function_definition';
+            },
+            highlightConnectors: true
+        },
+        {
+            target: '[data-block-type="function_definition"] input',
+            message: 'Name your function (e.g. "calculate")',
+            position: 'bottom',
+            waitForAction: element => {
+                const functionBlock = blocks.find(b => b.type === 'function_definition');
+                return functionBlock && functionBlock.data.function_name && functionBlock.data.function_name.length > 0;
+            }
+        },
+        {
+            target: '.category-logic',
+            message: 'Let\'s add some logic. Click on "Logic" to see logic blocks',
+            position: 'right',
+            waitForAction: element => element.querySelector('.category-content.collapsed') !== null,
+            autoAdvance: false
+        },
+        {
+            target: '[data-block-type="if_condition"]',
+            message: 'Drag an "If Condition" block to the workspace',
+            position: 'right',
+            waitForBlock: block => block.type === 'if_condition'
+        },
+        {
+            target: '.connector-parent',
+            message: 'Connect the Function block\'s output to the If block\'s input',
+            position: 'right',
+            waitForConnection: conn => {
+                const fromBlock = blocks.find(b => b.id === conn.fromBlockId);
+                const toBlock = blocks.find(b => b.id === conn.toBlockId);
+                return fromBlock && toBlock && 
+                       fromBlock.type === 'function_definition' && 
+                       toBlock.type === 'if_condition';
+            },
+            highlightConnectors: true
+        },
+        {
+            target: '[data-block-type="if_condition"] input',
+            message: 'Type a condition (e.g. "x > 0")',
+            position: 'bottom',
+            waitForAction: element => {
+                const ifBlock = blocks.find(b => b.type === 'if_condition');
+                return ifBlock && ifBlock.data.condition_text && ifBlock.data.condition_text.length > 0;
+            }
+        },
+        {
+            target: '.category-input-output',
+            message: 'Finally, add some output. Click on "Input/Output"',
+            position: 'right',
+            waitForAction: element => element.querySelector('.category-content.collapsed') !== null,
+            autoAdvance: false
+        },
+        {
+            target: '[data-block-type="log_message"]',
+            message: 'Drag a "Log Message" block to the workspace',
+            position: 'right',
+            waitForBlock: block => block.type === 'log_message'
+        },
+        {
+            target: '.connector-parent',
+            message: 'Connect the If block\'s "True" branch to the Log Message block',
+            position: 'right',
+            waitForConnection: conn => {
+                const fromBlock = blocks.find(b => b.id === conn.fromBlockId);
+                const toBlock = blocks.find(b => b.id === conn.toBlockId);
+                return fromBlock && toBlock && 
+                       fromBlock.type === 'if_condition' && 
+                       toBlock.type === 'log_message';
+            },
+            highlightConnectors: true
+        },
+        {
+            target: '[data-block-type="log_message"] input',
+            message: 'Type a message to log (e.g. "Condition is true!")',
+            position: 'bottom',
+            waitForAction: element => {
+                const logBlock = blocks.find(b => b.type === 'log_message');
+                return logBlock && logBlock.data.message && logBlock.data.message.length > 0;
+            }
+        },
+        {
+            target: '#generate-code-btn',
+            message: 'Great job! Now click "Generate Code" to see your complete JavaScript program.',
+            position: 'left'
+        },
+        {
+            target: '#generated-code',
+            message: 'You\'ve created a class with a method that includes conditional logic! This is the essence of visual programming with ScriptFlow.',
+            position: 'top'
+        }
+    ];
+
     // Make sure SVG layer covers the entire workspace area initially
     adjustSvgLayerSize();
 
     // Setup zoom and pan handlers
     setupZoomPan();
+
+    // New function definitions for toolbar actions
+    function createNewProject() {
+        if (blocks.length > 0) {
+            if (!confirm('Are you sure you want to create a new project? All unsaved changes will be lost.')) {
+                return;
+            }
+        }
+        
+        // Clear workspace
+        while (blocks.length > 0) {
+            const block = blocks[0];
+            if (block.element && block.element.parentNode) {
+                block.element.parentNode.removeChild(block.element);
+            }
+            blocks.shift();
+        }
+        
+        // Clear SVG connections
+        while (svgLayer.firstChild) {
+            svgLayer.removeChild(svgLayer.firstChild);
+        }
+        connections = [];
+        
+        // Reset IDs
+        nextBlockId = 0;
+        nextConnectionId = 0;
+        
+        // Reset zoom and pan
+        scale = 1;
+        panX = 0;
+        panY = 0;
+        applyZoomOnly();
+        
+        // Reset history
+        undoHistory = [];
+        currentStateIndex = -1;
+        saveState();
+        
+        // Reset generated code area
+        generatedCodeArea.textContent = "// Code will appear here";
+    }
+    
+    function saveProject() {
+        // Create a serializable state with all necessary data
+        const projectData = {
+            blocks: blocks.map(block => ({
+                id: block.id,
+                type: block.type,
+                data: {...block.data},
+                position: {
+                    left: block.element.style.left,
+                    top: block.element.style.top
+                },
+                connections: JSON.parse(JSON.stringify(block.connections))
+            })),
+            connections: connections.map(conn => ({
+                id: conn.id,
+                fromBlockId: conn.fromBlockId,
+                fromConnectorType: conn.fromConnectorType,
+                fromConnectorName: conn.fromConnectorName,
+                toBlockId: conn.toBlockId,
+                toConnectorType: conn.toConnectorType,
+                toConnectorName: conn.toConnectorName
+            })),
+            nextBlockId,
+            nextConnectionId,
+            viewSettings: {
+                panX,
+                panY,
+                scale
+            },
+            version: "2.0.0" // Version for compatibility checking in future
+        };
+        
+        // Convert to JSON string
+        const jsonData = JSON.stringify(projectData, null, 2);
+        
+        // Create a download link
+        const blob = new Blob([jsonData], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const downloadLink = document.createElement('a');
+        downloadLink.href = url;
+        downloadLink.download = 'scriptflow-project.json';
+        
+        // Trigger download
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+        URL.revokeObjectURL(url);
+    }
+    
+    function openProject() {
+        // Trigger the hidden file input
+        document.getElementById('file-input').click();
+    }
+    
+    function handleFileSelect(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        // Confirm before replacing current project
+        if (blocks.length > 0) {
+            if (!confirm('Opening a project will replace your current work. Continue?')) {
+                event.target.value = ''; // Reset the file input
+                return;
+            }
+        }
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const projectData = JSON.parse(e.target.result);
+                
+                // Version check for compatibility
+                if (!projectData.version) {
+                    alert('Warning: This project was created with an older version of ScriptFlow.');
+                }
+                
+                // Clear current project
+                createNewProject();
+                
+                // Load the project data
+                if (projectData.viewSettings) {
+                    scale = projectData.viewSettings.scale || 1;
+                    panX = projectData.viewSettings.panX || 0;
+                    panY = projectData.viewSettings.panY || 0;
+                    applyZoomOnly();
+                }
+                
+                // Set next IDs
+                nextBlockId = projectData.nextBlockId || 0;
+                nextConnectionId = projectData.nextConnectionId || 0;
+                
+                // Create blocks
+                projectData.blocks.forEach(blockData => {
+                    const left = parseFloat(blockData.position.left) || 0;
+                    const top = parseFloat(blockData.position.top) || 0;
+                    
+                    const block = createBlock(blockData.type, left, top);
+                    
+                    // Restore block data
+                    if (block) {
+                        block.data = {...blockData.data};
+                        
+                        // Update the input fields with the data
+                        const inputFields = block.element.querySelectorAll('input, textarea, select');
+                        inputFields.forEach(input => {
+                            const inputName = input.dataset.inputName;
+                            if (inputName && blockData.data[inputName] !== undefined) {
+                                if (input.type === 'checkbox') {
+                                    input.checked = blockData.data[inputName];
+                                } else {
+                                    input.value = blockData.data[inputName];
+                                }
+                            }
+                        });
+                        
+                        // Restore connection references
+                        block.connections = JSON.parse(JSON.stringify(blockData.connections));
+                    }
+                });
+                
+                // Create connections
+                projectData.connections.forEach(connData => {
+                    const fromBlock = blocks.find(b => b.id === connData.fromBlockId);
+                    const toBlock = blocks.find(b => b.id === connData.toBlockId);
+                    
+                    if (fromBlock && toBlock) {
+                        // Find connector elements
+                        const fromConnector = [...fromBlock.element.querySelectorAll('.connector')].find(c => 
+                            c.dataset.blockId === connData.fromBlockId &&
+                            c.dataset.connectorType === connData.fromConnectorType &&
+                            c.dataset.connectorName === connData.fromConnectorName
+                        );
+                        
+                        const toConnector = [...toBlock.element.querySelectorAll('.connector')].find(c => 
+                            c.dataset.blockId === connData.toBlockId &&
+                            c.dataset.connectorType === connData.toConnectorType &&
+                            c.dataset.connectorName === connData.toConnectorName
+                        );
+                        
+                        if (fromConnector && toConnector) {
+                            createConnection(
+                                { 
+                                    blockId: connData.fromBlockId, 
+                                    connectorElement: fromConnector, 
+                                    connectorType: connData.fromConnectorType, 
+                                    connectorName: connData.fromConnectorName 
+                                },
+                                { 
+                                    blockId: connData.toBlockId, 
+                                    connectorElement: toConnector, 
+                                    connectorType: connData.toConnectorType, 
+                                    connectorName: connData.toConnectorName 
+                                }
+                            );
+                        }
+                    }
+                });
+                
+                // Save initial state for undo/redo
+                saveState();
+                
+            } catch (error) {
+                console.error("Error loading project:", error);
+                alert("Error loading project file. The file may be corrupted or in an incompatible format.");
+            }
+            
+            // Reset the file input for future use
+            event.target.value = '';
+        };
+        
+        reader.readAsText(file);
+    }
+    
+    function showTutorial() {
+        // Reset tutorial state
+        tutorialMode = true;
+        tutorialStep = 0;
+        localStorage.removeItem('tutorialCompleted');
+        
+        // Initialize tutorial
+        if (tutorialTooltip) {
+            tutorialTooltip.remove();
+            tutorialTooltip = null;
+        }
+        
+        // Remove any existing skip button
+        const existingSkipBtn = document.getElementById('skip-tutorial-btn');
+        if (existingSkipBtn) {
+            existingSkipBtn.remove();
+        }
+        
+        // Create new skip button
+        const skipBtn = document.createElement('button');
+        skipBtn.id = 'skip-tutorial-btn';
+        skipBtn.className = 'skip-tutorial-btn';
+        skipBtn.textContent = 'Skip Tutorial';
+        skipBtn.addEventListener('click', endTutorial);
+        document.body.appendChild(skipBtn);
+        
+        // Clear any previous highlights
+        document.querySelectorAll('.tutorial-highlight').forEach(el => {
+            el.classList.remove('tutorial-highlight');
+        });
+        
+        // Update palette blocks with data-attributes for targeting
+        const paletteBlocks = document.querySelectorAll('.palette-block');
+        paletteBlocks.forEach(block => {
+            const text = block.textContent.trim();
+            block.setAttribute('data-block-type', text.toLowerCase().replace(/\s+/g, '_'));
+        });
+        
+        // Start with first step
+        showTutorialStep(0);
+        
+        // Automatically expand Flow Control category for the first step
+        setTimeout(() => {
+            const flowControlCategory = document.querySelector('.category-flow-control');
+            if (flowControlCategory) {
+                const header = flowControlCategory.querySelector('.category-header');
+                if (header && flowControlCategory.querySelector('.category-content.collapsed')) {
+                    header.click();
+                }
+            }
+        }, 1000);
+    }
 
     // Define helper functions that are used throughout
     function darkenColor(hex, percent) {
@@ -497,8 +1058,258 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function initTutorialMode() {
+        if (!tutorialMode) return;
+        
+        // Create skip tutorial button
+        const skipBtn = document.createElement('button');
+        skipBtn.id = 'skip-tutorial-btn';
+        skipBtn.className = 'skip-tutorial-btn';
+        skipBtn.textContent = 'Skip Tutorial';
+        skipBtn.addEventListener('click', endTutorial);
+        document.body.appendChild(skipBtn);
+        
+        // Start the tutorial
+        showTutorialStep(0);
+        
+        // Add data-block-type attributes to palette blocks for targeting in tutorial
+        const paletteBlocks = document.querySelectorAll('.palette-block');
+        paletteBlocks.forEach(block => {
+            const text = block.textContent.trim();
+            block.setAttribute('data-block-type', text.toLowerCase().replace(/\s+/g, '_'));
+        });
+        
+        // Automatically expand Flow Control category for the first step
+        setTimeout(() => {
+            const flowControlCategory = document.querySelector('.category-flow-control');
+            if (flowControlCategory) {
+                const header = flowControlCategory.querySelector('.category-header');
+                if (header && flowControlCategory.querySelector('.category-content.collapsed')) {
+                    header.click();
+                }
+            }
+        }, 1000);
+    }
+    
+    function showTutorialStep(stepIndex) {
+        if (stepIndex >= tutorialSteps.length) {
+            endTutorial();
+            return;
+        }
+        
+        tutorialStep = stepIndex;
+        const step = tutorialSteps[stepIndex];
+        
+        // Remove previous tooltip if it exists
+        if (tutorialTooltip) {
+            tutorialTooltip.remove();
+        }
+        
+        // Remove previous highlights
+        document.querySelectorAll('.tutorial-highlight').forEach(el => {
+            el.classList.remove('tutorial-highlight');
+        });
+        
+        // Find target element
+        const targetEl = document.querySelector(step.target);
+        if (!targetEl) {
+            console.warn(`Tutorial target not found: ${step.target}`);
+            showTutorialStep(stepIndex + 1);
+            return;
+        }
+        
+        // Create tooltip
+        tutorialTooltip = document.createElement('div');
+        tutorialTooltip.className = `tutorial-tooltip tooltip-${step.position}`;
+        tutorialTooltip.innerHTML = `
+            <div class="tooltip-arrow"></div>
+            <div class="tooltip-content">
+                <p>${step.message}</p>
+                <div class="tooltip-buttons">
+                    <button class="next-btn">${step.autoAdvance === false ? 'Done' : 'Next'}</button>
+                </div>
+            </div>
+        `;
+        
+        // Position tooltip relative to target
+        document.body.appendChild(tutorialTooltip);
+        positionTooltip(tutorialTooltip, targetEl, step.position);
+        
+        // Highlight target
+        targetEl.classList.add('tutorial-highlight');
+        
+        // Add button event listeners
+        tutorialTooltip.querySelector('.next-btn').addEventListener('click', () => {
+            targetEl.classList.remove('tutorial-highlight');
+            if (step.autoAdvance !== false) {
+                showTutorialStep(stepIndex + 1);
+            }
+        });
+        
+        // Special case: highlight connectors if needed
+        if (step.highlightConnectors) {
+            document.querySelectorAll('.connector').forEach(connector => {
+                connector.classList.add('connector-highlight');
+            });
+        }
+        
+        // Add event listeners for auto-advancing based on user actions
+        if (step.waitForBlock) {
+            // For generic block waiting
+            if (typeof step.waitForBlock === 'boolean') {
+                const originalBlockCount = blocks.length;
+                const checkForNewBlock = () => {
+                    if (blocks.length > originalBlockCount) {
+                        targetEl.classList.remove('tutorial-highlight');
+                        showTutorialStep(stepIndex + 1);
+                    } else if (tutorialMode) {
+                        setTimeout(checkForNewBlock, 500);
+                    }
+                };
+                setTimeout(checkForNewBlock, 500);
+            } 
+            // For specific block type checking
+            else if (typeof step.waitForBlock === 'function') {
+                const originalBlocks = [...blocks]; // Copy current blocks
+                const checkForSpecificBlock = () => {
+                    // Find new blocks that weren't in the original list
+                    const newBlocks = blocks.filter(b => !originalBlocks.some(ob => ob.id === b.id));
+                    const hasMatchingBlock = newBlocks.some(block => step.waitForBlock(block));
+                    
+                    if (hasMatchingBlock) {
+                        targetEl.classList.remove('tutorial-highlight');
+                        document.querySelectorAll('.connector-highlight').forEach(el => {
+                            el.classList.remove('connector-highlight');
+                        });
+                        showTutorialStep(stepIndex + 1);
+                    } else if (tutorialMode) {
+                        setTimeout(checkForSpecificBlock, 500);
+                    }
+                };
+                setTimeout(checkForSpecificBlock, 500);
+            }
+        }
+        
+        if (step.waitForConnection) {
+            // For simple connection checking
+            if (step.waitForConnection === true) {
+                const originalConnectionCount = connections.length;
+                const checkForNewConnection = () => {
+                    if (connections.length > originalConnectionCount) {
+                        targetEl.classList.remove('tutorial-highlight');
+                        document.querySelectorAll('.connector-highlight').forEach(el => {
+                            el.classList.remove('connector-highlight');
+                        });
+                        showTutorialStep(stepIndex + 1);
+                    } else if (tutorialMode) {
+                        setTimeout(checkForNewConnection, 500);
+                    }
+                };
+                setTimeout(checkForNewConnection, 500);
+            }
+            // For specific connection checking
+            else if (typeof step.waitForConnection === 'function') {
+                const originalConnections = [...connections]; // Copy current connections
+                const checkForSpecificConnection = () => {
+                    // Find new connections that weren't in the original list
+                    const newConnections = connections.filter(c => 
+                        !originalConnections.some(oc => oc.id === c.id));
+                    
+                    const hasMatchingConnection = newConnections.some(conn => step.waitForConnection(conn));
+                    
+                    if (hasMatchingConnection) {
+                        targetEl.classList.remove('tutorial-highlight');
+                        document.querySelectorAll('.connector-highlight').forEach(el => {
+                            el.classList.remove('connector-highlight');
+                        });
+                        showTutorialStep(stepIndex + 1);
+                    } else if (tutorialMode) {
+                        setTimeout(checkForSpecificConnection, 500);
+                    }
+                };
+                setTimeout(checkForSpecificConnection, 500);
+            }
+        }
+        
+        // For custom action checking
+        if (step.waitForAction && typeof step.waitForAction === 'function') {
+            const checkForAction = () => {
+                if (step.waitForAction(targetEl)) {
+                    targetEl.classList.remove('tutorial-highlight');
+                    document.querySelectorAll('.connector-highlight').forEach(el => {
+                        el.classList.remove('connector-highlight');
+                    });
+                    showTutorialStep(stepIndex + 1);
+                } else if (tutorialMode) {
+                    setTimeout(checkForAction, 500);
+                }
+            };
+            setTimeout(checkForAction, 500);
+        }
+    }
+    
+    function positionTooltip(tooltip, target, position) {
+        const targetRect = target.getBoundingClientRect();
+        const tooltipRect = tooltip.getBoundingClientRect();
+        
+        switch (position) {
+            case 'top':
+                tooltip.style.left = (targetRect.left + targetRect.width/2 - tooltipRect.width/2) + 'px';
+                tooltip.style.top = (targetRect.top - tooltipRect.height - 10) + 'px';
+                break;
+            case 'bottom':
+                tooltip.style.left = (targetRect.left + targetRect.width/2 - tooltipRect.width/2) + 'px';
+                tooltip.style.top = (targetRect.bottom + 10) + 'px';
+                break;
+            case 'left':
+                tooltip.style.left = (targetRect.left - tooltipRect.width - 10) + 'px';
+                tooltip.style.top = (targetRect.top + targetRect.height/2 - tooltipRect.height/2) + 'px';
+                break;
+            case 'right':
+                tooltip.style.left = (targetRect.right + 10) + 'px';
+                tooltip.style.top = (targetRect.top + targetRect.height/2 - tooltipRect.height/2) + 'px';
+                break;
+        }
+    }
+    
+    function endTutorial() {
+        tutorialMode = false;
+        localStorage.setItem('tutorialCompleted', 'true');
+        
+        // Clean up tutorial elements
+        if (tutorialTooltip) {
+            tutorialTooltip.remove();
+            tutorialTooltip = null;
+        }
+        
+        document.querySelectorAll('.tutorial-highlight').forEach(el => {
+            el.classList.remove('tutorial-highlight');
+        });
+        
+        const skipBtn = document.getElementById('skip-tutorial-btn');
+        if (skipBtn) skipBtn.remove();
+    }
+
+    // Add a Reset Tutorial button in the main UI
+    function addTutorialControls() {
+        const controlsContainer = document.getElementById('workspace-controls');
+        
+        const tutorialBtn = document.createElement('button');
+        tutorialBtn.textContent = '?';
+        tutorialBtn.title = 'Start Tutorial';
+        tutorialBtn.addEventListener('click', () => {
+            tutorialMode = true;
+            localStorage.removeItem('tutorialCompleted');
+            initTutorialMode();
+        });
+        
+        controlsContainer.appendChild(document.createElement('div')).className = 'divider';
+        controlsContainer.appendChild(tutorialBtn);
+    }
+
     // Initialize block palette with categories
     populateBlockPalette();
+    initTutorialMode();
 
     workspace.addEventListener('dragover', (e) => {
         e.preventDefault(); // Allow dropping
@@ -1808,6 +2619,8 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Initial state save
         saveState();
+
+        addTutorialControls();
     }
 
     function applyZoomOnly() {
