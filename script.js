@@ -1,4 +1,8 @@
 document.addEventListener('DOMContentLoaded', () => {
+    const nextLabel = "v";
+    const previousLabel = "^";
+    const bodyLabel = "{--}"
+
     // Make getConnectedValue available globally for blocks.js
     window.getConnectedValue = getConnectedValue;
 
@@ -1049,12 +1053,15 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Set appropriate label text
         if (className.includes('child')) {
-            labelText = 'In';
+            labelText = previousLabel;
         } else if (className.includes('parent')) {
             if (name === 'parent') {
                 labelText = 'Out';
-            } else if (name === 'branch') {
-                labelText = 'True';
+            } else if (name === 'branch' || name === 'body') {
+                labelText = bodyLabel;
+            }
+            else if (name === 'next') {
+                labelText = nextLabel; // Keep as 'Next' for sequential flow
             }
         } else if (className.includes('input')) {
             // Keep the name or use a shorter version if needed
@@ -1678,6 +1685,7 @@ document.addEventListener('DOMContentLoaded', () => {
         content.className = 'script-block-content';
         blockElement.appendChild(content);
 
+        // Initialize blockData object FIRST
         const blockData = {};
 
         // Add input fields from 'inputs' array in definition
@@ -1689,35 +1697,56 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 let inputField;
                 
+                // Set default value in blockData
+                let defaultValue;
+                switch(inputDef.type) {
+                    case "boolean":
+                        defaultValue = false;
+                        break;
+                    case "number":
+                        defaultValue = 0;
+                        break;
+                    case "select":
+                        defaultValue = inputDef.options && inputDef.options[0] ? inputDef.options[0].value : "";
+                        break;
+                    default:
+                        defaultValue = "";
+                        break;
+                }
+                blockData[inputDef.name] = defaultValue;
+                
                 // Create different input types based on the input definition
                 switch(inputDef.type) {
                     case "boolean":
                         inputField = document.createElement('input');
                         inputField.type = "checkbox";
-                        inputField.checked = blockData[inputDef.name] || false;
+                        inputField.checked = defaultValue;
                         inputField.classList.add('input-checkbox');
                         inputField.addEventListener('change', e => {
                             blockData[inputDef.name] = e.target.checked;
+                            console.log(`Updated ${inputDef.name}:`, e.target.checked);
                         });
                         break;
                         
                     case "number":
                         inputField = document.createElement('input');
                         inputField.type = "number";
-                        inputField.value = blockData[inputDef.name] || 0;
+                        inputField.value = defaultValue;
                         inputField.classList.add('input-number');
                         inputField.addEventListener('input', e => {
                             blockData[inputDef.name] = parseFloat(e.target.value) || 0;
+                            console.log(`Updated ${inputDef.name}:`, blockData[inputDef.name]);
                         });
                         break;
                         
                     case "multiline":
                         inputField = document.createElement('textarea');
-                        inputField.value = blockData[inputDef.name] || "";
+                        inputField.value = defaultValue;
                         inputField.rows = inputDef.rows || 3;
                         inputField.classList.add('input-multiline');
                         inputField.addEventListener('input', e => {
                             blockData[inputDef.name] = e.target.value;
+                            console.log(`Updated ${inputDef.name}:`, e.target.value);
                         });
                         break;
 
@@ -1735,9 +1764,10 @@ document.addEventListener('DOMContentLoaded', () => {
                             });
                         }
                         
-                        inputField.value = blockData[inputDef.name] || (inputDef.options && inputDef.options[0] ? inputDef.options[0].value : "");
+                        inputField.value = defaultValue;
                         inputField.addEventListener('change', e => {
                             blockData[inputDef.name] = e.target.value;
+                            console.log(`Updated ${inputDef.name}:`, e.target.value);
                         });
                         break;
                             
@@ -1745,10 +1775,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     default:
                         inputField = document.createElement('input');
                         inputField.type = "text";
-                        inputField.value = blockData[inputDef.name] || "";
+                        inputField.value = defaultValue;
                         inputField.classList.add('input-text');
                         inputField.addEventListener('input', e => {
                             blockData[inputDef.name] = e.target.value;
+                            console.log(`Updated ${inputDef.name}:`, e.target.value);
                         });
                         break;
                 }
@@ -1773,6 +1804,14 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
         
+        // Add the block to the workspace FIRST so we can measure its actual size
+        makeDraggable(blockElement);
+        workspace.appendChild(blockElement);
+        
+        // NOW calculate the actual block dimensions after it's been rendered
+        const actualBlockHeight = blockElement.offsetHeight;
+        const actualBlockWidth = blockElement.offsetWidth;
+        
         // ENHANCED CONNECTOR SYSTEM - Create connectors dynamically based on definition
         
         // Flow Input Connectors (Top)
@@ -1786,12 +1825,21 @@ document.addEventListener('DOMContentLoaded', () => {
             const parentConnector = createConnectorElement(blockId, 'flowOut', 'parent', 'connector-parent');
             blockElement.appendChild(parentConnector);
         }
+
+        if (definition.hasNextFlowOut) {
+            const nextConnector = createConnectorElement(blockId, 'flowOut', 'next', 'connector-parent connector-next');
+            nextConnector.style.bottom = '-8px';
+            nextConnector.style.right = '10px';
+            nextConnector.querySelector('.connector-text').textContent = nextLabel || 'Next';
+            blockElement.appendChild(nextConnector);
+        }
         
         // Branch Flow Outputs (Multiple if needed)
         if (definition.hasBranchFlowOut) {
-            const branchConnector = createConnectorElement(blockId, 'flowOut', 'branch', 'connector-parent');
+            const branchConnector = createConnectorElement(blockId, 'flowOut', 'body', 'connector-parent');
             branchConnector.style.bottom = '-8px';
             branchConnector.style.left = '75%';
+            branchConnector.querySelector('.connector-text').textContent = bodyLabel || 'Body';
             blockElement.appendChild(branchConnector);
         }
 
@@ -1825,18 +1873,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // ENHANCED: Data Input connectors with flexible positioning
         if (definition.dataInputs) {
+            // Calculate minimum height needed for all data inputs
+            const minHeightForInputs = Math.max(
+                actualBlockHeight, 
+                40 + (definition.dataInputs.length * 35) // Header + spacing per input
+            );
+            
+            // Set minimum height if needed
+            if (minHeightForInputs > actualBlockHeight) {
+                blockElement.style.minHeight = `${minHeightForInputs}px`;
+            }
+            
             definition.dataInputs.forEach((dataInputDef, index) => {
                 const inputConnector = createConnectorElement(blockId, 'dataInput', dataInputDef.name, 'connector-input');
                 
                 // Calculate position based on block height and number of inputs
-                const blockEstimatedHeight = 60 + (definition.inputs?.length || 0) * 35;
+                const blockHeight = Math.max(actualBlockHeight, minHeightForInputs);
                 const totalInputs = definition.dataInputs.length;
-                const spacing = Math.max(30, blockEstimatedHeight / (totalInputs + 1));
+                const usableHeight = blockHeight - 40; // Subtract header height
+                const spacing = usableHeight / (totalInputs + 1);
                 
-                inputConnector.style.top = `${spacing * (index + 1)}px`;
+                inputConnector.style.top = `${40 + spacing * (index + 1)}px`; // Start after header
                 inputConnector.style.left = '-8px';
                 
-                // Custom positioning if specified
+                // Custom positioning if specified (overrides calculated position)
                 if (dataInputDef.position) {
                     if (dataInputDef.position.top !== undefined) {
                         inputConnector.style.top = dataInputDef.position.top;
@@ -1852,18 +1912,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // ENHANCED: Data Output connectors with flexible positioning
         if (definition.dataOutputs) {
+            // Calculate minimum height needed for all data outputs
+            const minHeightForOutputs = Math.max(
+                actualBlockHeight, 
+                40 + (definition.dataOutputs.length * 35) // Header + spacing per output
+            );
+            
+            // Set minimum height if needed
+            if (minHeightForOutputs > actualBlockHeight) {
+                blockElement.style.minHeight = `${minHeightForOutputs}px`;
+            }
+            
             definition.dataOutputs.forEach((dataOutputDef, index) => {
                 const outputConnector = createConnectorElement(blockId, 'dataOutput', dataOutputDef.name, 'connector-output');
                 
                 // Calculate position based on block height and number of outputs
-                const blockEstimatedHeight = 60 + (definition.inputs?.length || 0) * 35;
+                const blockHeight = Math.max(actualBlockHeight, minHeightForOutputs);
                 const totalOutputs = definition.dataOutputs.length;
-                const spacing = Math.max(30, blockEstimatedHeight / (totalOutputs + 1));
+                const usableHeight = blockHeight - 40; // Subtract header height
+                const spacing = usableHeight / (totalOutputs + 1);
                 
-                outputConnector.style.top = `${spacing * (index + 1)}px`;
+                outputConnector.style.top = `${40 + spacing * (index + 1)}px`; // Start after header
                 outputConnector.style.right = '-8px';
                 
-                // Custom positioning if specified
+                // Custom positioning if specified (overrides calculated position)
                 if (dataOutputDef.position) {
                     if (dataOutputDef.position.top !== undefined) {
                         outputConnector.style.top = dataOutputDef.position.top;
@@ -1876,51 +1948,33 @@ document.addEventListener('DOMContentLoaded', () => {
                 blockElement.appendChild(outputConnector);
             });
         }
-
-        makeDraggable(blockElement);
-        workspace.appendChild(blockElement);
         
         // Check if we need to expand the workspace
         ensureWorkspaceSize(x + blockElement.offsetWidth, y + blockElement.offsetHeight);
         
-        // Store the input field data and create input listeners
-        const inputFields = blockElement.querySelectorAll('input, textarea, select');
-        inputFields.forEach(input => {
-            const inputName = input.dataset.inputName;
-            if (inputName) {
-                if (input.type === 'checkbox') {
-                    blockData[inputName] = input.checked;
-                    input.addEventListener('change', e => {
-                        blockData[inputName] = e.target.checked;
-                    });
-                } else {
-                    blockData[inputName] = input.value;
-                    input.addEventListener('input', e => {
-                        blockData[inputName] = e.target.value;
-                    });
-                }
-            }
-        });
-        
-        blocks.push({ 
+        // Create the block object and add it to the blocks array
+        const blockObject = { 
             id: blockId, 
             type: type, 
             element: blockElement, 
             definition, 
-            data: blockData,
+            data: blockData,  // Use the properly initialized blockData
             // Initialize connection arrays with support for multiple custom connectors
             connections: { 
-                flowIn: null, 
-                flowOut: [], 
-                branch: [], 
-                elseBranch: [],
-                customFlowOutputs: {}, // For custom flow outputs
-                dataInputs: {}, 
-                dataOutputs: {} 
-            } 
-        });
+            flowIn: null, 
+            flowOut: [], 
+            branch: [], 
+            elseBranch: [],
+            next: [], // Add this for sequential "next" blocks
+            customFlowOutputs: {}, // For custom flow outputs
+            dataInputs: {}, 
+            dataOutputs: {} 
+        }
+        };
         
-        return blocks[blocks.length - 1]; // Return the created block object
+        blocks.push(blockObject);
+        
+        return blockObject; // Return the created block object
     }
 
     function handleConnectorMouseDown(e) {
@@ -2147,6 +2201,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else if (from.connectorName === 'branch') {
                     fromBlock.connections.branch = fromBlock.connections.branch || [];
                     fromBlock.connections.branch.push(newConnection.id);
+                } else if (from.connectorName === 'next') {
+                    // Add support for "next" connections
+                    fromBlock.connections.next = fromBlock.connections.next || [];
+                    fromBlock.connections.next.push(newConnection.id);
                 }
             } else if (from.connectorType === 'dataOutput') {
                 fromBlock.connections.dataOutputs[from.connectorName] = fromBlock.connections.dataOutputs[from.connectorName] || [];
@@ -2405,7 +2463,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (index > 0) {
                 finalCode += "\n\n// === New Start Block ===\n\n";
             }
-            finalCode += generateCodeForBlock(startBlock);
+            // Pass initial empty context
+            const initialContext = { inClass: false, className: null, inMethod: false, methodName: null };
+            finalCode += generateCodeForBlock(startBlock, new Set(), initialContext);
         });
         
         // Format the generated code for better readability
@@ -2457,7 +2517,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return formatted.join('\n');
     }
 
-    function getConnectedValue(block, inputName) {
+    function getConnectedValue(block, inputName, context) {
         // Check if there's a data input connection for this input
         const connId = block.connections.dataInputs?.[inputName];
         if (connId) {
@@ -2468,204 +2528,227 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (sourceBlock) {
                     // Handle different source block types
                     if (sourceBlock.type === "value_definition") {
-                        // Use the getValue method for value blocks
-                        if (sourceBlock.definition.getValue) {
-                            return sourceBlock.definition.getValue(sourceBlock);
-                        } else {
-                            // Fallback to toCode if getValue doesn't exist
-                            return sourceBlock.definition.toCode(sourceBlock);
-                        }
+                        return sourceBlock.definition.getValue(sourceBlock, context);
                     } else if (sourceBlock.type === "variable_get") {
-                        // For variable_get blocks, return the variable name without quotes
-                        return sourceBlock.data.varName || "myVar";
-                    } else if (sourceBlock.type === "boolean_value") {
-                        return sourceBlock.data.value === true ? "true" : "false";
-                    } else if (sourceBlock.type === "math_operation") {
-                        // Get connected values for math operation inputs
-                        const leftValue = getConnectedValue(sourceBlock, "left_value") || sourceBlock.data.left || "0";
-                        const rightValue = getConnectedValue(sourceBlock, "right_value") || sourceBlock.data.right || "0";
-                        const operation = sourceBlock.data.operation || "+";
-                        return `(${leftValue} ${operation} ${rightValue})`;
+                        return sourceBlock.definition.getValue(sourceBlock, context);
                     } else if (sourceBlock.type === "comparison") {
-                        // Get connected values for comparison inputs
-                        const leftValue = getConnectedValue(sourceBlock, "left_value") || sourceBlock.data.left || "0";
-                        const rightValue = getConnectedValue(sourceBlock, "right_value") || sourceBlock.data.right || "0";
-                        const operator = sourceBlock.data.operator || "==";
-                        return `(${leftValue} ${operator} ${rightValue})`;
-                    } else if (sourceBlock.type === "object_property") {
-                        const objectName = sourceBlock.data.objectName || "obj";
-                        const propertyName = sourceBlock.data.propertyName || "prop";
-                        return `${objectName}.${propertyName}`;
+                        return sourceBlock.definition.getValue(sourceBlock, context);
+                    } else if (sourceBlock.type === "math_operation") {
+                        return sourceBlock.definition.getValue(sourceBlock, context);
                     } else if (sourceBlock.type === "string_operation") {
-                        const string = sourceBlock.data.string || '""';
-                        const operation = sourceBlock.data.operation || "toUpperCase";
-                        const param1 = sourceBlock.data.param1 || "";
-                        const param2 = sourceBlock.data.param2 || "";
-                        
-                        if (operation === "substring" && param1) {
-                            return param2 ? `${string}.${operation}(${param1}, ${param2})` : `${string}.${operation}(${param1})`;
-                        } else {
-                            return `${string}.${operation}()`;
-                        }
-                    } else if (sourceBlock.data && sourceBlock.data.value !== undefined) {
-                        return sourceBlock.data.value;
+                        return sourceBlock.definition.getValue(sourceBlock, context);
+                    } else if (sourceBlock.type === "object_property") {
+                        return sourceBlock.definition.getValue(sourceBlock, context);
+                    } else if (sourceBlock.type === "boolean_value") {
+                        return sourceBlock.definition.getValue(sourceBlock, context);
+                    }
+                    
+                    // Generic fallback: check if the block has a getValue method
+                    if (sourceBlock.definition && sourceBlock.definition.getValue) {
+                        return sourceBlock.definition.getValue(sourceBlock, context);
                     }
                 }
             }
         }
-        return null; // No connection found
+        
+        // If no connection found, return null (caller should handle fallback to input fields)
+        return null;
     }
 
-    function generateCodeForBlock(block, visited = new Set()) {
+    function generateCodeForBlock(block, visited = new Set(), context = { inClass: false, className: null, inMethod: false, methodName: null }) {
         if (!block || visited.has(block.id)) return "";
 
         visited.add(block.id);
         let code = "";
 
-        // Handle container blocks specially (class, function, etc.)
-        if (block.definition.isContainer) {
-            // Get child blocks (flow out from this container)
-            let childrenCode = "";
-            if (Array.isArray(block.connections.flowOut)) {
-                for (const flowOutId of block.connections.flowOut) {
-                    const conn = connections.find(c => c.id === flowOutId);
-                    if (conn) {
-                        const childBlockId = conn.toBlockId;
-                        const childBlock = blocks.find(b => b.id === childBlockId);
-                        if (childBlock) {
-                            // Create separate visited set for children to allow proper nesting
-                            const childVisited = new Set();
-                            childrenCode += generateCodeForBlock(childBlock, childVisited);
-                        }
-                    }
+        // Update context based on current block type
+        let currentContext = { ...context };
+        
+        if (block.definition.type === "class_definition") {
+            currentContext.inClass = true;
+            currentContext.className = block.data.className || "MyClass";
+        } else if (block.definition.type === "method_definition" || 
+                block.definition.type === "constructor_definition" ||
+                block.definition.type === "function_definition") {
+            if (context.inClass) {
+                currentContext.inMethod = true;
+                currentContext.methodName = block.data.methodName || block.data.funcName || "constructor";
+            } else {
+                // Reset class context if we're in a standalone function
+                currentContext.inClass = false;
+            }
+        }
+
+        // Handle container blocks (blocks that can contain other blocks)
+        if (block.definition.isContainer || block.definition.hasBranchFlowOut) {
+            
+            // Get child blocks from branch connections - these go INSIDE the {}
+            let bodyCode = "";
+            
+            // 1. Check for connections FROM this block's body connector TO other blocks
+            const bodyConnections = connections.filter(conn => 
+                conn.fromBlockId === block.id && 
+                conn.fromConnectorName === 'body'
+            );
+            
+            for (const conn of bodyConnections) {
+                const childBlock = blocks.find(b => b.id === conn.toBlockId);
+                if (childBlock) {
+                    const childVisited = new Set(visited);
+                    bodyCode += generateCodeForBlock(childBlock, childVisited, currentContext);
                 }
             }
             
-            // Call the block's toCode with children code
-            code += block.definition.toCode(block, "", childrenCode);
-            
-            // After container block, continue with main flow (not necessarily visited)
-            // This requires special handling as containers operate on their own scope
-        } 
-        // Handle if block specially (it's a partial container)
-        else if (block.definition.type === "if_condition") {
-            // Get condition from connected data input first, then fall back to text field
-            let conditionValue = getConnectedValue(block, "condition");
-            if (conditionValue === null) {
-                conditionValue = block.data.condition_text || "true";
-            }
-            
-            console.log("If condition value:", conditionValue); // Debug log
-            
-            // Process the true branch
-            let trueCode = "";
+            // 2. Also check branch connections array for backward compatibility
             if (Array.isArray(block.connections.branch)) {
                 for (const branchConnId of block.connections.branch) {
                     const conn = connections.find(c => c.id === branchConnId);
                     if (conn) {
-                        const branchBlockId = conn.toBlockId;
-                        const branchBlock = blocks.find(b => b.id === branchBlockId);
-                        if (branchBlock) {
-                            // Create a new visited set for the true branch
-                            const branchVisited = new Set();
-                            trueCode += generateCodeForBlock(branchBlock, branchVisited);
-                        }
-                    }
-                }
-            }
-            
-            // Process the else branch
-            let elseCode = "";
-            if (Array.isArray(block.connections.elseBranch)) {
-                for (const elseBranchConnId of block.connections.elseBranch) {
-                    const conn = connections.find(c => c.id === elseBranchConnId);
-                    if (conn) {
-                        const elseBlockId = conn.toBlockId;
-                        const elseBlock = blocks.find(b => b.id === elseBlockId);
-                        if (elseBlock) {
-                            // Create a new visited set for the else branch
-                            const elseVisited = new Set();
-                            elseCode += generateCodeForBlock(elseBlock, elseVisited);
-                        }
-                    }
-                }
-            }
-            
-            // Generate the if statement with the proper condition
-            let code = `if (${conditionValue}) {\n`;
-            if (trueCode) {
-                code += trueCode.split('\n').map(line => line ? `  ${line}` : line).join('\n').trimEnd() + "\n";
-            }
-            code += `}\n`;
-            
-            // Add else block if there's else code
-            if (elseCode) {
-                code += ` else {\n`;
-                code += elseCode.split('\n').map(line => line ? `  ${line}` : line).join('\n').trimEnd() + "\n";
-                code += `}\n`;
-            }
-            
-            return code;
-        }
-        else if (block.definition.type === "class_definition") {
-            // Initialize code sections
-            let constructorCode = "";
-            let methodsCode = "";
-            
-            // Process connected blocks
-            if (Array.isArray(block.connections.flowOut)) {
-                for (const flowOutId of block.connections.flowOut) {
-                    const conn = connections.find(c => c.id === flowOutId);
-                    if (conn) {
                         const childBlockId = conn.toBlockId;
                         const childBlock = blocks.find(b => b.id === childBlockId);
                         if (childBlock) {
-                            const childVisited = new Set();
-                            
-                            // Detect if this child is a method or constructor content
-                            if (childBlock.definition.type === "function_definition") {
-                                // This is a class method - should appear directly inside the class
-                                // but outside the constructor
-                                methodsCode += generateCodeForBlock(childBlock, childVisited);
-                            } else {
-                                // Regular code - should go in constructor
-                                constructorCode += generateCodeForBlock(childBlock, childVisited);
+                            const childVisited = new Set(visited);
+                            bodyCode += generateCodeForBlock(childBlock, childVisited, currentContext);
+                        }
+                    }
+                }
+            }
+            
+            // Special handling for if/else blocks with chaining
+            if (block.definition.type === "if_condition" || 
+                block.definition.type === "else_if_condition" || 
+                block.definition.type === "else") {
+                
+                // Use bodyCode for the if body content
+                code += block.definition.toCode(block, "", bodyCode, currentContext);
+                
+                // Handle chained else-if/else blocks through "next" connections
+                if (Array.isArray(block.connections.next)) {
+                    for (const nextConnId of block.connections.next) {
+                        const conn = connections.find(c => c.id === nextConnId);
+                        if (conn) {
+                            const nextBlockId = conn.toBlockId;
+                            const nextBlock = blocks.find(b => b.id === nextBlockId);
+                            if (nextBlock && (nextBlock.type === 'else_if_condition' || nextBlock.type === 'else')) {
+                                // Chain else-if/else blocks directly
+                                const chainedCode = generateCodeForBlock(nextBlock, visited, currentContext);
+                                code += chainedCode;
+                            } else if (nextBlock) {
+                                // Regular next block - add newline and continue AFTER the if block
+                                code += "\n" + generateCodeForBlock(nextBlock, visited, currentContext);
                             }
                         }
                     }
                 }
+                
+                return code + (code.endsWith('\n') ? '' : '\n');
+            }
+            // Handle all other container blocks uniformly
+            else {
+                // Call the block's toCode with the body content and context
+                code += block.definition.toCode(block, "", bodyCode, currentContext);
+                
+                // Handle "next" connections for container blocks - these come AFTER the container
+                const nextConnections = connections.filter(conn => 
+                    conn.fromBlockId === block.id && 
+                    conn.fromConnectorName === 'next'
+                );
+                
+                for (const conn of nextConnections) {
+                    const nextBlock = blocks.find(b => b.id === conn.toBlockId);
+                    if (nextBlock) {
+                        // Reset context after leaving a class or method
+                        let nextContext = currentContext;
+                        if (block.definition.type === "class_definition") {
+                            nextContext = { inClass: false, className: null, inMethod: false, methodName: null };
+                        } else if (block.definition.type === "method_definition" || 
+                                block.definition.type === "constructor_definition" ||
+                                block.definition.type === "function_definition") {
+                            nextContext = { ...currentContext, inMethod: false, methodName: null };
+                        }
+                        code += generateCodeForBlock(nextBlock, visited, nextContext);
+                    }
+                }
+                
+                // Fallback: Check flowOut connections for "parent" connector (standard sequential flow)
+                if (nextConnections.length === 0) {
+                    const parentConnections = connections.filter(conn => 
+                        conn.fromBlockId === block.id && 
+                        conn.fromConnectorName === 'parent'
+                    );
+                    
+                    for (const conn of parentConnections) {
+                        const nextBlock = blocks.find(b => b.id === conn.toBlockId);
+                        if (nextBlock) {
+                            let nextContext = currentContext;
+                            if (block.definition.type === "class_definition") {
+                                nextContext = { inClass: false, className: null, inMethod: false, methodName: null };
+                            }
+                            code += generateCodeForBlock(nextBlock, visited, nextContext);
+                        }
+                    }
+                }
+            }
+        }
+        // Handle non-container blocks
+        else {
+            // For standard blocks, generate their code with context
+            code += block.definition.toCode(block, currentContext);
+            
+            // Handle next blocks for non-container blocks
+            const nextConnections = connections.filter(conn => 
+                conn.fromBlockId === block.id && 
+                conn.fromConnectorName === 'next'
+            );
+            
+            for (const conn of nextConnections) {
+                const nextBlock = blocks.find(b => b.id === conn.toBlockId);
+                if (nextBlock) {
+                    code += generateCodeForBlock(nextBlock, visited, currentContext);
+                }
             }
             
-            // Generate the complete class code
-            const className = block.data.class_name || "MyClass";
-            code += `class ${className} {\n`;
-            code += `  constructor() {\n${constructorCode}  }\n\n`;
-            
-            // Add methods outside constructor, directly inside the class
-            code += methodsCode;
-            
-            code += `}\n`;
-        }
-        else {
-            // For standard blocks
-            code += block.definition.toCode(block);
-        }
-        
-        // Continue with normal flow (for non-container blocks and after if-statements)
-        if (!block.definition.isContainer && Array.isArray(block.connections.flowOut)) {
-            for (const flowOutId of block.connections.flowOut) {
-                const conn = connections.find(c => c.id === flowOutId);
-                if (conn) {
-                    const nextBlockId = conn.toBlockId;
-                    const nextBlock = blocks.find(b => b.id === nextBlockId);
+            // Fallback to parent connections for backwards compatibility
+            if (nextConnections.length === 0) {
+                const parentConnections = connections.filter(conn => 
+                    conn.fromBlockId === block.id && 
+                    conn.fromConnectorName === 'parent'
+                );
+                
+                for (const conn of parentConnections) {
+                    const nextBlock = blocks.find(b => b.id === conn.toBlockId);
                     if (nextBlock) {
-                        code += generateCodeForBlock(nextBlock, visited);
+                        code += generateCodeForBlock(nextBlock, visited, currentContext);
                     }
                 }
             }
         }
         
         return code;
+    }
+
+    // Add helper function to auto-add "this." when needed
+    function addThisIfNeeded(variableName, context) {
+        if (!context || !context.inClass || !context.inMethod) {
+            return variableName;
+        }
+        
+        // Don't add this. to certain reserved words or patterns
+        const reservedWords = ['console', 'window', 'document', 'Math', 'Date', 'Array', 'Object', 'String', 'Number', 'Boolean'];
+        const isReserved = reservedWords.some(word => variableName.startsWith(word));
+        
+        // Don't add this. if it already has it, or if it's a function call, or if it contains dots
+        if (variableName.startsWith('this.') || 
+            variableName.includes('(') || 
+            variableName.includes('.') ||
+            isReserved ||
+            variableName.startsWith('"') ||
+            variableName.startsWith("'") ||
+            /^\d/.test(variableName)) { // Starts with number
+            return variableName;
+        }
+        
+        return `this.${variableName}`;
     }
 
     // Undo System Functions

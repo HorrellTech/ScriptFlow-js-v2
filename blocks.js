@@ -1,4 +1,52 @@
 // Only define BLOCK_DEFINITIONS if it doesn't already exist
+/*
+    * ScriptFlow Block Definitions
+
+    * This file contains the definitions for all blocks used in ScriptFlow.js.
+    * Each block has properties like type, label, color, category, inputs, and methods to generate code.
+    * 
+    * WHAT THE OPTIONS MEAN:
+    * type: Unique identifier for the block type.
+    * label: Display name for the block in the editor.
+    * color: Color code for the block.
+    * category: Category under which the block will be listed in the editor.
+    * hasFlowIn: Indicates if the block can accept flow input.
+    * hasFlowOut: Indicates if the block can output flow.
+    * hasNextFlowOut: Indicates if the block can output to the next block in the flow, making the next block come after it.
+    * hasBranchFlowOut: (body) Indicates if the block can output to a branch (like in if-else conditions), will 
+         place the next blocks inside the current block body '{}'.
+    * isContainer: Indicates if the block can contain other blocks (like loops or conditionals).
+    * inputs: Array of input fields for the block, each with a name, type, and label.
+    * dataInputs: Array of data inputs that can be connected to other blocks, each with a name, type, and label.
+    * dataOutputs: Array of data outputs that can be connected to other blocks, each with a name, type, and label.
+    * toCode: Function that generates the code for the block based on its data.
+    * getValue: Function that retrieves the value from the block, used for data inputs/outputs.
+    * 
+    * Example:
+    * {
+    *   type: "example_block",
+    *   label: "Example Block",
+    *   color: "#ff0000",
+    *   category: "Example Category",
+    *   hasFlowIn: true,
+    *   hasFlowOut: true,
+    *   hasNextFlowOut: true,
+    *   hasBranchFlowOut: false,
+    *   isContainer: false,
+    *   inputs: [
+    *       { name: "exampleInput", type: "string", label: "Example Input:" }
+    *   ],
+    *   dataInputs: [
+    *       { name: "exampleDataInput", type: "any", label: "Example Data Input" }
+    *   ],
+    *   dataOutputs: [
+    *       { name: "exampleDataOutput", type: "any", label: "Example Data Output" }
+    *   ],
+    *   toCode: function(block) {
+    *       return `console.log("${block.data.exampleInput}");\n`;
+    *   }
+    * }
+*/
 if (typeof BLOCK_DEFINITIONS === 'undefined') {
     const BLOCK_DEFINITIONS = {
         "start": {
@@ -7,42 +55,92 @@ if (typeof BLOCK_DEFINITIONS === 'undefined') {
             color: "#22c55e", // Green
             category: "Flow Control",
             hasFlowIn: false,
-            hasFlowOut: true,
+            hasFlowOut: false,
+            hasNextFlowOut: true,
             inputs: [
                 { name: "comment", type: "multiline", label: "Script start comments:", rows: 3 }
             ],
-            outputs: [],
             toCode: function(block) {
                 const comment = block.data.comment || "";
-                return `/*\nScript Start${comment ? ": \n"  + comment : ""}\n*/\n`;
+                return `/*\nScript Start${comment ? ": \n" + comment : ""}\n*/\n`;
             }
         },
+
         "comment": {
             type: "comment",
             label: "Comment",
-            color: "#22c55e", // Green
+            color: "#6b7280", // Gray
             category: "Misc",
             hasFlowIn: true,
-            hasFlowOut: true,
+            hasFlowOut: false,
+            hasNextFlowOut: true,
             inputs: [
-                { name: "comment", type: "multiline", label: "Script start comments:", rows: 3 }
+                { name: "comment", type: "multiline", label: "Comment:", rows: 3 }
             ],
-            outputs: [],
             toCode: function(block) {
                 const comment = block.data.comment || "";
-                return `/*\n${comment ? ": " + comment : ""}\n*/\n`;
+                return `/*\n${comment}\n*/\n`;
             }
         },
+
+        "log_message": {
+            type: "log_message",
+            label: "Log Message",
+            color: "#3b82f6", // Blue
+            category: "Input/Output",
+            hasFlowIn: true,
+            hasFlowOut: false,
+            hasNextFlowOut: true,
+            inputs: [
+                { name: "message", type: "string", label: "Message:" }
+            ],
+            dataInputs: [
+                { name: "input_message", type: "any", label: "Message" }
+            ],
+            toCode: function(block, context) {
+                // Check if there's a connected input value first
+                let message = null;
+                
+                // Try to get connected value using the global getConnectedValue function
+                if (typeof getConnectedValue === 'function') {
+                    message = getConnectedValue(block, "input_message", context);
+                }
+                
+                // If no connected value, fall back to the text input field
+                if (message === null || message === undefined) {
+                    message = block.data.message || "";
+                    
+                    // Auto-add this. to variable references in the message if needed
+                    if (typeof addThisIfNeeded === 'function' && message && !message.startsWith('"') && !message.startsWith("'")) {
+                        message = addThisIfNeeded(message, context);
+                    }
+                }
+                
+                // Handle empty message
+                if (!message || message === "") {
+                    message = ""; // Empty string for empty messages
+                }
+                
+                // If the message is already a quoted string or expression, use it directly
+                if (typeof message === 'string' && (message.startsWith('"') || message.startsWith("'") || message.includes('('))) {
+                    return `console.log(${message});\n`;
+                } else {
+                    // Otherwise, wrap it in quotes
+                    return `console.log("${String(message).replace(/"/g, '\\"')}");\n`;
+                }
+            }
+        },
+
         "console": {
             type: "console",
             label: "Log Console Message",
             color: "#3b82f6", // Blue
             category: "Input/Output",
             hasFlowIn: true,
-            hasFlowOut: true,
+            hasFlowOut: false,
+            hasNextFlowOut: true,
             inputs: [
                 { name: "message", type: "multiline", label: "Message:", rows: 2 },
-                // Add dropdown for log level if needed
                 { name: "logLevel", type: "select", label: "Log Level:",
                 options: [
                     { value: "info", label: "Info" },
@@ -51,7 +149,6 @@ if (typeof BLOCK_DEFINITIONS === 'undefined') {
                     { value: "debug", label: "Debug" }
                 ]}
             ],
-            outputs: [],
             toCode: function(block) {
                 const message = block.data.message || "";
                 const logLevel = block.data.logLevel || "info";
@@ -67,13 +164,15 @@ if (typeof BLOCK_DEFINITIONS === 'undefined') {
                 }
             }
         },
+
         "variable_declare": {
             type: "variable_declare",
             label: "Declare Variable",
             color: "#a855f7", // Purple
             category: "Variables",
             hasFlowIn: true,
-            hasFlowOut: true,
+            hasFlowOut: false,
+            hasNextFlowOut: true,
             inputs: [
                 { name: "varName", type: "string", label: "Name:" },
                 { name: "value", type: "string", label: "Value:" },
@@ -87,115 +186,129 @@ if (typeof BLOCK_DEFINITIONS === 'undefined') {
                     { value: "array", label: "Array" }
                 ]}
             ],
-            outputs: [],
-            toCode: function(block) {
+            dataInputs: [
+                { name: "input_value", type: "any", label: "Value" }
+            ],
+            toCode: function(block, context) {
                 const varName = block.data.varName || "myVar";
-                const value = block.data.value || "null";
                 const varType = block.data.varType || "auto";
+                
+                // Try to get connected value first
+                let value = null;
+                if (typeof getConnectedValue === 'function') {
+                    value = getConnectedValue(block, "input_value");
+                }
+                
+                // Fall back to text input field
+                if (value === null || value === undefined) {
+                    value = block.data.value || "null";
+                }
                 
                 // Format value based on type
                 let formattedValue = value;
-                if (varType === "string") {
-                    formattedValue = `"${value.replace(/"/g, '\\"')}"`;
-                } else if (varType === "array") {
-                    formattedValue = value.startsWith('[') ? value : `[${value}]`;
-                } else if (varType === "object") {
-                    formattedValue = value.startsWith('{') ? value : `{${value}}`;
+                if (varType === "string" && !String(value).startsWith('"')) {
+                    formattedValue = `"${String(value).replace(/"/g, '\\"')}"`;
+                } else if (varType === "array" && !String(value).startsWith('[')) {
+                    formattedValue = `[${value}]`;
+                } else if (varType === "object" && !String(value).startsWith('{')) {
+                    formattedValue = `{${value}}`;
                 } else if (varType === "number") {
                     formattedValue = isNaN(parseFloat(value)) ? 0 : value;
                 } else if (varType === "boolean") {
-                    formattedValue = ["true", "yes", "1"].includes(value.toLowerCase()) ? "true" : "false";
-                } else if (varType === "auto") {
-                    // Basic type detection for strings
-                    if (typeof value === 'string' && !value.match(/^(\d+(\.\d+)?|true|false|null|undefined)$/)) {
-                        formattedValue = `"${value.replace(/"/g, '\\"')}"`;
-                    }
+                    formattedValue = ["true", "yes", "1"].includes(String(value).toLowerCase()) ? "true" : "false";
                 }
                 
-                return `let ${varName} = ${formattedValue};\n`;
-            }
-        },
-        "log_message": {
-            type: "log_message",
-            label: "Log Message",
-            color: "#3b82f6", // Blue
-            category: "Input/Output",
-            hasFlowIn: true,
-            hasFlowOut: true,
-            inputs: [
-                { name: "message", type: "string", label: "Message:" }
-            ],
-            dataInputs: [
-                { name: "input_message", type: "any", label: "Message" }
-            ],
-            outputs: [],
-            toCode: function(block) {
-                // Check if there's a connected input value first
-                let message;
-                
-                // Try to get connected value using the global getConnectedValue function
-                if (typeof getConnectedValue === 'function') {
-                    const connectedValue = getConnectedValue(block, "input_message");
-                    message = connectedValue || block.data.message || "";
+                // In class methods, use this.varName instead of let varName
+                if (context && context.inClass && context.inMethod) {
+                    return `this.${varName} = ${formattedValue};\n`;
                 } else {
-                    message = block.data.message || "";
-                }
-                
-                // If the message is already a quoted string or expression, use it directly
-                if (typeof message === 'string' && (message.startsWith('"') || message.startsWith("'") || message.includes('('))) {
-                    return `console.log(${message});\n`;
-                } else {
-                    // Otherwise, wrap it in quotes
-                    return `console.log("${String(message).replace(/"/g, '\\"')}");\n`;
+                    return `let ${varName} = ${formattedValue};\n`;
                 }
             }
         },
+
         "variable_get": {
             type: "variable_get",
             label: "Get Variable",
             color: "#a855f7", // Purple
             category: "Variables",
-            hasFlowIn: false, // Not part of the flow
-            hasFlowOut: false, // Not part of the flow
+            hasFlowIn: false,
+            hasFlowOut: false,
             inputs: [
                 { name: "varName", type: "string", label: "Variable Name:" }
             ],
             dataOutputs: [
                 { name: "value", type: "any", label: "Value" }
             ],
-            toCode: function(block) {
-                // This block provides a value, doesn't generate standalone code
+            toCode: function(block, context) {
                 return "";
             },
-            // Helper function to get the actual value for use in connections
-            getValue: function(block) {
-                return block.data.varName || "myVar";
+            getValue: function(block, context) {
+                let varName = block.data.varName || "myVar";
+                
+                // Auto-add this. if needed
+                if (typeof addThisIfNeeded === 'function') {
+                    varName = addThisIfNeeded(varName, context);
+                }
+                
+                return varName;
+            }
+        },
+
+        "assignment": {
+            type: "assignment",
+            label: "Assignment",
+            color: "#a855f7", // Purple
+            category: "Variables",
+            hasFlowIn: true,
+            hasFlowOut: false,
+            hasNextFlowOut: true,
+            inputs: [
+                { name: "varName", type: "string", label: "Variable Name:" },
+                { name: "value", type: "string", label: "Value:" }
+            ],
+            dataInputs: [
+                { name: "input_value", type: "any", label: "Value" }
+            ],
+            toCode: function(block, context) {
+                let varName = block.data.varName || "myVar";
+                
+                // Auto-add this. if needed
+                if (typeof addThisIfNeeded === 'function') {
+                    varName = addThisIfNeeded(varName, context);
+                }
+                
+                // Try to get connected value first
+                let value = null;
+                if (typeof getConnectedValue === 'function') {
+                    value = getConnectedValue(block, "input_value");
+                }
+                
+                // Fall back to text input field
+                if (value === null || value === undefined) {
+                    value = block.data.value || "null";
+                }
+                
+                return `${varName} = ${value};\n`;
             }
         },
 
         "if_condition": {
             type: "if_condition",
             label: "If Condition",
-            color: "#dd6b20", // Darker Orange for dark theme
+            color: "#dd6b20", // Orange
             category: "Flow Control",
             hasFlowIn: true,
-            hasFlowOut: true, // Main flow out (after if block)
-            hasBranchFlowOut: true, // For the 'true' branch
-            isContainer: true, // Mark as container to properly handle nesting
-            // Define data inputs (connectors on the left)
+            hasFlowOut: false,
+            hasNextFlowOut: true,
+            hasBranchFlowOut: true,
+            inputs: [ 
+                { name: "condition_text", type: "string", label: "Condition:" }
+            ],
             dataInputs: [
                 { name: "condition", type: "boolean", label: "Condition" }
             ],
-            // Keep text input for condition as a fallback
-            inputs: [ 
-                { name: "condition_text", type: "string", label: "Condition (text fallback):" }
-            ],
-            outputs: [
-                // we need an else branch output to handle the 'else' case
-                { name: "else_branch", type: "flow", label: "Else Branch" }
-            ], // Data outputs if any
             toCode: function(block, nextBlockCode, branchBlockCode) {
-                // FIXED: Get the connected value properly
                 let condition = "true";
                 
                 // First try to get from connected data input
@@ -208,11 +321,100 @@ if (typeof BLOCK_DEFINITIONS === 'undefined') {
                         condition = block.data.condition_text || "true";
                     }
                 } else {
-                    // Fall back to text input if getConnectedValue not available
                     condition = block.data.condition_text || "true";
                 }
                 
                 let code = `if (${condition}) {\n`;
+                if (branchBlockCode) {
+                    code += branchBlockCode.split('\n').map(line => line ? `  ${line}` : line).join('\n').trimEnd() + "\n";
+                }
+                code += `}`;
+                return code;
+            }
+        },
+
+        "else_if_condition": {
+            type: "else_if_condition",
+            label: "Else If Condition",
+            color: "#f97316", // Orange
+            category: "Flow Control",
+            hasFlowIn: true,
+            hasFlowOut: false,
+            hasNextFlowOut: true,
+            hasBranchFlowOut: true,
+            inputs: [
+                { name: "condition_text", type: "string", label: "Condition:" }
+            ],
+            dataInputs: [
+                { name: "condition", type: "boolean", label: "Condition" }
+            ],
+            toCode: function(block, nextBlockCode, branchBlockCode) {
+                let condition = "true";
+                
+                // First try to get from connected data input
+                if (typeof getConnectedValue === 'function') {
+                    const connectedCondition = getConnectedValue(block, "condition");
+                    if (connectedCondition !== null) {
+                        condition = connectedCondition;
+                    } else {
+                        // Fall back to text input
+                        condition = block.data.condition_text || "true";
+                    }
+                } else {
+                    condition = block.data.condition_text || "true";
+                }
+                
+                let code = ` else if (${condition}) {\n`;
+                if (branchBlockCode) {
+                    code += branchBlockCode.split('\n').map(line => line ? `  ${line}` : line).join('\n').trimEnd() + "\n";
+                }
+                code += `}`;
+                return code;
+            }
+        },
+
+        "else": {
+            type: "else",
+            label: "Else",
+            color: "#ea580c", // Orange
+            category: "Flow Control",
+            hasFlowIn: true,
+            hasFlowOut: false,
+            hasNextFlowOut: true,
+            hasBranchFlowOut: true,
+            isContainer: true,
+            inputs: [],
+            toCode: function(block, nextBlockCode, branchBlockCode) {
+                let code = ` else {\n`;
+                if (branchBlockCode) {
+                    code += branchBlockCode.split('\n').map(line => line ? `  ${line}` : line).join('\n').trimEnd() + "\n";
+                }
+                code += `}`;
+                return code;
+            }
+        },
+
+        "for_loop": {
+            type: "for_loop",
+            label: "For Loop",
+            color: "#e11d48", // Rose
+            category: "Flow Control",
+            hasFlowIn: true,
+            hasFlowOut: false,
+            hasNextFlowOut: true,
+            hasBranchFlowOut: true,
+            isContainer: true,
+            inputs: [
+                { name: "init", type: "string", label: "Initialization:" },
+                { name: "condition", type: "string", label: "Condition:" },
+                { name: "increment", type: "string", label: "Increment:" }
+            ],
+            toCode: function(block, nextBlockCode, branchBlockCode) {
+                const init = block.data.init || "let i = 0";
+                const condition = block.data.condition || "i < 10";
+                const increment = block.data.increment || "i++";
+                
+                let code = `for (let ${init} = 0; ${condition}; ${increment}) {\n`;
                 if (branchBlockCode) {
                     code += branchBlockCode.split('\n').map(line => line ? `  ${line}` : line).join('\n').trimEnd() + "\n";
                 }
@@ -221,562 +423,46 @@ if (typeof BLOCK_DEFINITIONS === 'undefined') {
             }
         },
 
-        "multi_condition": {
-            type: "multi_condition",
-            label: "Multi Condition",
-            color: "#f59e0b",
-            category: "Flow Control",
-            hasFlowIn: true,
-            hasFlowOut: false, // No default flow out
-            isContainer: true,
-            
-            // Multiple data inputs
-            dataInputs: [
-                { name: "condition1", type: "boolean", label: "Condition 1" },
-                { name: "condition2", type: "boolean", label: "Condition 2" },
-                { name: "value", type: "any", label: "Value", position: { top: "80px" } }
-            ],
-            
-            // Multiple flow outputs
-            flowOutputs: [
-                { name: "case1", label: "Case 1" },
-                { name: "case2", label: "Case 2" },
-                { name: "default", label: "Default" }
-            ],
-            
-            // Custom toCode that handles all the connectors
-            toCode: function(block, nextBlockCode, branchBlockCode) {
-                // Get connected values for each input
-                const condition1 = getConnectedValue(block, "condition1") || "false";
-                const condition2 = getConnectedValue(block, "condition2") || "false";
-                const value = getConnectedValue(block, "value") || "null";
-                
-                // Generate code based on connected outputs
-                let code = `// Multi-condition check with value: ${value}\n`;
-                code += `if (${condition1}) {\n`;
-                code += `  // Case 1 code would go here\n`;
-                code += `} else if (${condition2}) {\n`;
-                code += `  // Case 2 code would go here\n`;
-                code += `} else {\n`;
-                code += `  // Default case code would go here\n`;
-                code += `}\n`;
-                
-                return code;
-            }
-        },
-        
-        // Add a new block for boolean value output
-        "boolean_value": {
-            type: "boolean_value",
-            label: "Boolean Value",
-            color: "#84cc16", // Lime (matching Input/Output category)
-            category: "Input/Output", // Changed from "Logic" to match the new Value block
-            hasFlowIn: false, // Not part of the flow
-            hasFlowOut: false, // Not part of the flow
-            inputs: [
-                { name: "value", type: "boolean", label: "Value:" }
-            ],
-            // Data output connector on the right
-            dataOutputs: [
-                { name: "output", type: "boolean", label: "Output" }
-            ],
-            toCode: function(block) {
-                // This block provides a value, doesn't generate standalone code
-                return "";
-            }
-        },
-        
-        // Class definition block
-        "class_definition": {
-            type: "class_definition",
-            label: "Class Definition",
-            color: "#0e7490", // Teal
-            category: "Objects", 
-            hasFlowIn: true,
-            hasFlowOut: true,
-            isContainer: true, // Indicate this is a container block
-            inputs: [
-                { name: "className", type: "string", label: "Class Name:" }
-            ],
-            outputs: [],
-            toCode: function(block, nextBlockCode, childrenCode) {
-                const className = block.data.className || "MyClass";
-                let code = `class ${className} {\n`;
-                
-                // Add child content if any
-                if (childrenCode) {
-                    code += childrenCode.split('\n').map(line => `  ${line}`).join('\n');
-                    if (!childrenCode.endsWith('\n')) code += '\n';
-                }
-                
-                code += `}\n`;
-                return code;
-            }
-        },
-        
-        // Constructor block - for use inside class blocks
-        "constructor_definition": {
-            type: "constructor_definition",
-            label: "Constructor",
-            color: "#0369a1", // Lighter blue
-            category: "Objects", 
-            hasFlowIn: true,
-            hasFlowOut: true,
-            isContainer: true,
-            inputs: [
-                { name: "params", type: "string", label: "Parameters (comma-separated):" }
-            ],
-            outputs: [],
-            toCode: function(block, nextBlockCode, childrenCode) {
-                const params = block.data.params || "";
-                let code = `constructor(${params}) {\n`;
-                
-                // Add child content if any
-                if (childrenCode) {
-                    code += childrenCode.split('\n').map(line => `  ${line}`).join('\n');
-                    if (!childrenCode.endsWith('\n')) code += '\n';
-                }
-                
-                code += "}\n";
-                return code;
-            }
-        },
-        
-        // Function definition block
-        "function_definition": {
-            type: "function_definition",
-            label: "Function Definition",
-            color: "#7e22ce", // Indigo
-            category: "Functions", 
-            hasFlowIn: true,
-            hasFlowOut: true,
-            isContainer: true,
-            inputs: [
-                { name: "funcName", type: "string", label: "Function Name:" },
-                { name: "params", type: "string", label: "Parameters (comma-separated):" }
-            ],
-            outputs: [],
-            toCode: function(block, nextBlockCode, childrenCode) {
-                const funcName = block.data.funcName || "myFunction";
-                const params = block.data.params || "";
-                let code = `function ${funcName}(${params}) {\n`;
-                
-                // Add child content if any
-                if (childrenCode) {
-                    code += childrenCode.split('\n').map(line => `  ${line}`).join('\n');
-                    if (!childrenCode.endsWith('\n')) code += '\n';
-                }
-                
-                code += "}\n";
-                return code;
-            }
-        },
-        
-        // Method definition block - for use inside class blocks
-        "method_definition": {
-            type: "method_definition",
-            label: "Method Definition",
-            color: "#0891b2", // Cyan
-            category: "Objects", 
-            hasFlowIn: true,
-            hasFlowOut: true,
-            isContainer: true,
-            inputs: [
-                { name: "methodName", type: "string", label: "Method Name:" },
-                { name: "params", type: "string", label: "Parameters (comma-separated):" }
-            ],
-            outputs: [],
-            toCode: function(block, nextBlockCode, childrenCode) {
-                const methodName = block.data.methodName || "myMethod";
-                const params = block.data.params || "";
-                let code = `${methodName}(${params}) {\n`;
-                
-                // Add child content if any
-                if (childrenCode) {
-                    code += childrenCode.split('\n').map(line => `  ${line}`).join('\n');
-                    if (!childrenCode.endsWith('\n')) code += '\n';
-                }
-                
-                code += "}\n";
-                return code;
-            }
-        },
-        
-        // ===== NEW BLOCKS =====
-        
-        // For Loop
-        "for_loop": {
-            type: "for_loop",
-            label: "For Loop",
-            color: "#e11d48", // Rose
-            category: "Flow Control",
-            hasFlowIn: true,
-            hasFlowOut: true,
-            hasBranchFlowOut: true, // For the loop body
-            isContainer: true, // Mark as container to properly handle loop body nesting
-            inputs: [
-                { name: "init", type: "string", label: "Initialization:" },
-                { name: "condition", type: "string", label: "Condition:" },
-                { name: "increment", type: "string", label: "Increment:" }
-            ],
-            outputs: [],
-            toCode: function(block, nextBlockCode, branchBlockCode) {
-                const init = block.data.init || "let i = 0";
-                const condition = block.data.condition || "i < 10";
-                const increment = block.data.increment || "i++";
-                
-                let code = `for (${init}; ${condition}; ${increment}) {\n`;
-                if (branchBlockCode) {
-                    code += branchBlockCode.split('\n').map(line => `  ${line}`).join('\n').trimEnd() + "\n";
-                }
-                code += `}\n`;
-                return code;
-            }
-        },
-        
-        // While Loop
         "while_loop": {
             type: "while_loop",
             label: "While Loop",
             color: "#dc2626", // Red
             category: "Flow Control",
             hasFlowIn: true,
-            hasFlowOut: true,
-            hasBranchFlowOut: true, // For the loop body
-            isContainer: true, // Mark as container to properly handle loop body nesting
+            hasFlowOut: false,
+            hasNextFlowOut: true,
+            hasBranchFlowOut: true,
+            isContainer: true,
             inputs: [
                 { name: "condition", type: "string", label: "Condition:" }
             ],
             dataInputs: [
-                { name: "condition", type: "boolean", label: "Condition" }
+                { name: "condition_input", type: "boolean", label: "Condition" }
             ],
-            outputs: [],
             toCode: function(block, nextBlockCode, branchBlockCode) {
-                const condition = block.data.condition || "true";
+                let condition = "true";
+                
+                // Try to get connected condition first
+                if (typeof getConnectedValue === 'function') {
+                    const connectedCondition = getConnectedValue(block, "condition_input");
+                    if (connectedCondition !== null) {
+                        condition = connectedCondition;
+                    } else {
+                        condition = block.data.condition || "true";
+                    }
+                } else {
+                    condition = block.data.condition || "true";
+                }
                 
                 let code = `while (${condition}) {\n`;
                 if (branchBlockCode) {
-                    code += branchBlockCode.split('\n').map(line => `  ${line}`).join('\n').trimEnd() + "\n";
+                    code += branchBlockCode.split('\n').map(line => line ? `  ${line}` : line).join('\n').trimEnd() + "\n";
                 }
                 code += `}\n`;
                 return code;
-            }
-        },
-        
-        // If-Else Condition
-        "if_else_condition": {
-            type: "if_else_condition",
-            label: "If-Else Condition",
-            color: "#ea580c", // Orange
-            category: "Flow Control",
-            hasFlowIn: true,
-            hasFlowOut: true,
-            hasBranchFlowOut: true, // For the 'true' branch 
-            hasElseBranchFlowOut: true, // For the 'else' branch
-            isContainer: true, // Mark as container to properly handle nesting
-            dataInputs: [
-                { name: "condition", type: "boolean", label: "Condition" }
-            ],
-            inputs: [
-                { name: "condition_text", type: "string", label: "Condition (text):" }
-            ],
-            outputs: [],
-            toCode: function(block, nextBlockCode, ifBlockCode, elseBlockCode) {
-                const condition = block.data.condition_text || "true";
-                
-                let code = `if (${condition}) {\n`;
-                if (ifBlockCode) {
-                    code += ifBlockCode.split('\n').map(line => `  ${line}`).join('\n').trimEnd() + "\n";
-                }
-                code += `} else {\n`;
-                if (elseBlockCode) {
-                    code += elseBlockCode.split('\n').map(line => `  ${line}`).join('\n').trimEnd() + "\n";
-                }
-                code += `}\n`;
-                return code;
-            }
-        },
-        
-        // Array Operations
-        "array_operation": {
-            type: "array_operation",
-            label: "Array Operation",
-            color: "#eab308", // Yellow
-            category: "Arrays",
-            hasFlowIn: true,
-            hasFlowOut: true,
-            inputs: [
-                { name: "arrayName", type: "string", label: "Array Name:" },
-                { name: "operation", type: "select", label: "Operation:", 
-                options: [
-                    { value: "push", label: "Push" },
-                    { value: "pop", label: "Pop" },
-                    { value: "shift", label: "Shift" },
-                    { value: "unshift", label: "Unshift" },
-                    { value: "sort", label: "Sort" },
-                    { value: "reverse", label: "Reverse" }
-                ]},
-                { name: "value", type: "string", label: "Value (for push/unshift):" }
-            ],
-            outputs: [],
-            toCode: function(block) {
-                const arrayName = block.data.arrayName || "myArray";
-                const operation = block.data.operation || "push";
-                const value = block.data.value || "";
-                
-                if (["push", "unshift"].includes(operation) && value) {
-                    return `${arrayName}.${operation}(${value});\n`;
-                } else {
-                    return `${arrayName}.${operation}();\n`;
-                }
-            }
-        },
-        
-        // Object Property Access
-        "object_property": {
-            type: "object_property",
-            label: "Object Property",
-            color: "#14b8a6", // Teal
-            category: "Objects",
-            hasFlowIn: false,
-            hasFlowOut: false,
-            inputs: [
-                { name: "objectName", type: "string", label: "Object Name:" },
-                { name: "propertyName", type: "string", label: "Property Name:" }
-            ],
-            dataOutputs: [
-                { name: "value", type: "any", label: "Value" }
-            ],
-            toCode: function(block) {
-                // This block provides a value, doesn't generate standalone code
-                return "";
             }
         },
 
-        // Value Definition Block
-        "value_definition": {
-            type: "value_definition",
-            label: "Value",
-            color: "#84cc16", // Lime (matching Input/Output category)
-            category: "Input/Output",
-            hasFlowIn: false, // Not part of the flow - just provides values
-            hasFlowOut: false, // Not part of the flow
-            inputs: [
-                { name: "valueType", type: "select", label: "Value Type:", 
-                options: [
-                    { value: "string", label: "String" },
-                    { value: "number", label: "Number" },
-                    { value: "boolean", label: "Boolean" },
-                    { value: "array", label: "Array" },
-                    { value: "object", label: "Object" },
-                    { value: "null", label: "Null" },
-                    { value: "undefined", label: "Undefined" }
-                ]},
-                { name: "stringValue", type: "string", label: "String Value:" },
-                { name: "numberValue", type: "number", label: "Number Value:" },
-                { name: "booleanValue", type: "boolean", label: "Boolean Value:" },
-                { name: "arrayValue", type: "multiline", label: "Array Value (JSON):", rows: 3 },
-                { name: "objectValue", type: "multiline", label: "Object Value (JSON):", rows: 3 }
-            ],
-            // Data output connector on the right
-            dataOutputs: [
-                { name: "output", type: "any", label: "Value" }
-            ],
-            toCode: function(block) {
-                // This block provides a value, doesn't generate standalone code
-                // The actual value will be used when connected to other blocks
-                const valueType = block.data.valueType || "string";
-                
-                switch(valueType) {
-                    case "string":
-                        return `"${(block.data.stringValue || "").replace(/"/g, '\\"')}"`;
-                    case "number":
-                        return String(block.data.numberValue || 0);
-                    case "boolean":
-                        return String(block.data.booleanValue === true);
-                    case "array":
-                        try {
-                            return block.data.arrayValue || "[]";
-                        } catch (e) {
-                            return "[]";
-                        }
-                    case "object":
-                        try {
-                            return block.data.objectValue || "{}";
-                        } catch (e) {
-                            return "{}";
-                        }
-                    case "null":
-                        return "null";
-                    case "undefined":
-                        return "undefined";
-                    default:
-                        return '""';
-                }
-            },
-            // Helper function to get the actual value for use in connections
-            getValue: function(block) {
-                const valueType = block.data.valueType || "string";
-                
-                switch(valueType) {
-                    case "string":
-                        return `"${(block.data.stringValue || "").replace(/"/g, '\\"')}"`;
-                    case "number":
-                        return String(block.data.numberValue || 0);
-                    case "boolean":
-                        return block.data.booleanValue === true ? "true" : "false";
-                    case "array":
-                        try {
-                            return block.data.arrayValue || "[]";
-                        } catch (e) {
-                            return "[]";
-                        }
-                    case "object":
-                        try {
-                            return block.data.objectValue || "{}";
-                        } catch (e) {
-                            return "{}";
-                        }
-                    case "null":
-                        return "null";
-                    case "undefined":
-                        return "undefined";
-                    default:
-                        return '""';
-                }
-            }
-        },
-        
-        // Assignment
-        "assignment": {
-            type: "assignment",
-            label: "Assignment",
-            color: "#a855f7", // Purple
-            category: "Variables",
-            hasFlowIn: true,
-            hasFlowOut: true,
-            inputs: [
-                { name: "varName", type: "string", label: "Variable Name:" },
-                { name: "value", type: "string", label: "Value:" }
-            ],
-            dataInputs: [
-                { name: "input_value", type: "any", label: "Value" }
-            ],
-            outputs: [],
-            toCode: function(block) {
-                const varName = block.data.varName || "myVar";
-                const value = block.data.value || "null";
-                return `${varName} = ${value};\n`;
-            }
-        },
-        
-        // Math Operation
-        "math_operation": {
-            type: "math_operation",
-            label: "Math Operation",
-            color: "#8b5cf6", // Violet
-            category: "Math",
-            hasFlowIn: false,
-            hasFlowOut: false,
-            inputs: [
-                { name: "left", type: "string", label: "Left Operand:" },
-                { name: "operation", type: "select", label: "Operation:", 
-                options: [
-                    { value: "+", label: "Add (+)" },
-                    { value: "-", label: "Subtract (-)" },
-                    { value: "*", label: "Multiply (*)" },
-                    { value: "/", label: "Divide (/)" },
-                    { value: "%", label: "Modulo (%)" },
-                    { value: "**", label: "Power (**)" }
-                ]},
-                { name: "right", type: "string", label: "Right Operand:" }
-            ],
-            dataInputs: [
-                { name: "left_value", type: "number", label: "Left" },
-                { name: "right_value", type: "number", label: "Right" }
-            ],
-            dataOutputs: [
-                { name: "result", type: "number", label: "Result" }
-            ],
-            toCode: function(block) {
-                // This block provides a value, doesn't generate standalone code
-                return "";
-            }
-        },
-        
-        // String Operation
-        "string_operation": {
-            type: "string_operation",
-            label: "String Operation",
-            color: "#10b981", // Emerald
-            category: "Strings",
-            hasFlowIn: false,
-            hasFlowOut: false,
-            inputs: [
-                { name: "string", type: "string", label: "String:" },
-                { name: "operation", type: "select", label: "Operation:", 
-                options: [
-                    { value: "toUpperCase", label: "To Upper Case" },
-                    { value: "toLowerCase", label: "To Lower Case" },
-                    { value: "trim", label: "Trim" },
-                    { value: "substring", label: "Substring" }
-                ]},
-                { name: "param1", type: "string", label: "Parameter 1 (optional):" },
-                { name: "param2", type: "string", label: "Parameter 2 (optional):" }
-            ],
-            dataOutputs: [
-                { name: "result", type: "string", label: "Result" }
-            ],
-            toCode: function(block) {
-                // This block provides a value, doesn't generate standalone code
-                return "";
-            }
-        },
-        
-        // Function Call
-        "function_call": {
-            type: "function_call",
-            label: "Function Call",
-            color: "#6366f1", // Indigo
-            category: "Functions",
-            hasFlowIn: true,
-            hasFlowOut: true,
-            inputs: [
-                { name: "funcName", type: "string", label: "Function Name:" },
-                { name: "params", type: "string", label: "Parameters (comma-separated):" }
-            ],
-            dataOutputs: [
-                { name: "return_value", type: "any", label: "Return Value" }
-            ],
-            toCode: function(block) {
-                const funcName = block.data.funcName || "myFunction";
-                const params = block.data.params || "";
-                return `${funcName}(${params});\n`;
-            }
-        },
-        
-        // Return Statement
-        "return_statement": {
-            type: "return_statement",
-            label: "Return Statement",
-            color: "#6366f1", // Indigo
-            category: "Functions",
-            hasFlowIn: true,
-            hasFlowOut: false, // No flow out as this ends execution of the function
-            inputs: [
-                { name: "value", type: "string", label: "Return Value:" }
-            ],
-            dataInputs: [
-                { name: "return_value", type: "any", label: "Value" }
-            ],
-            outputs: [],
-            toCode: function(block) {
-                const value = block.data.value || "";
-                return `return ${value};\n`;
-            }
-        },
-        
-        // Comparison Operation
         "comparison": {
             type: "comparison",
             label: "Comparison",
@@ -807,26 +493,492 @@ if (typeof BLOCK_DEFINITIONS === 'undefined') {
                 { name: "result", type: "boolean", label: "Result" }
             ],
             toCode: function(block) {
-                // This block provides a value, doesn't generate standalone code
                 return "";
+            },
+            getValue: function(block) {
+                // Try to get connected values first
+                let leftValue = null;
+                let rightValue = null;
+                
+                if (typeof getConnectedValue === 'function') {
+                    leftValue = getConnectedValue(block, "left_value");
+                    rightValue = getConnectedValue(block, "right_value");
+                }
+                
+                // Fall back to text input fields if no connected values
+                if (leftValue === null || leftValue === undefined) {
+                    leftValue = block.data.left || "0";
+                }
+                if (rightValue === null || rightValue === undefined) {
+                    rightValue = block.data.right || "0";
+                }
+                
+                const operator = block.data.operator || "==";
+                return `(${leftValue} ${operator} ${rightValue})`;
             }
         },
-        
-        // Try-Catch Block
+
+        "math_operation": {
+            type: "math_operation",
+            label: "Math Operation",
+            color: "#8b5cf6", // Violet
+            category: "Math",
+            hasFlowIn: false,
+            hasFlowOut: false,
+            inputs: [
+                { name: "left", type: "string", label: "Left Operand:" },
+                { name: "operation", type: "select", label: "Operation:", 
+                options: [
+                    { value: "+", label: "Add (+)" },
+                    { value: "-", label: "Subtract (-)" },
+                    { value: "*", label: "Multiply (*)" },
+                    { value: "/", label: "Divide (/)" },
+                    { value: "%", label: "Modulo (%)" },
+                    { value: "**", label: "Power (**)" }
+                ]},
+                { name: "right", type: "string", label: "Right Operand:" }
+            ],
+            dataInputs: [
+                { name: "left_value", type: "number", label: "Left" },
+                { name: "right_value", type: "number", label: "Right" }
+            ],
+            dataOutputs: [
+                { name: "result", type: "number", label: "Result" }
+            ],
+            toCode: function(block) {
+                return "";
+            },
+            getValue: function(block) {
+                // Try to get connected values first
+                let leftValue = null;
+                let rightValue = null;
+                
+                if (typeof getConnectedValue === 'function') {
+                    leftValue = getConnectedValue(block, "left_value");
+                    rightValue = getConnectedValue(block, "right_value");
+                }
+                
+                // Fall back to text input fields if no connected values
+                if (leftValue === null || leftValue === undefined) {
+                    leftValue = block.data.left || "0";
+                }
+                if (rightValue === null || rightValue === undefined) {
+                    rightValue = block.data.right || "0";
+                }
+                
+                const operation = block.data.operation || "+";
+                return `(${leftValue} ${operation} ${rightValue})`;
+            }
+        },
+
+        "value_definition": {
+            type: "value_definition",
+            label: "Value",
+            color: "#84cc16", // Lime
+            category: "Input/Output",
+            hasFlowIn: false,
+            hasFlowOut: false,
+            inputs: [
+                { name: "valueType", type: "select", label: "Value Type:", 
+                options: [
+                    { value: "string", label: "String" },
+                    { value: "number", label: "Number" },
+                    { value: "boolean", label: "Boolean" },
+                    { value: "array", label: "Array" },
+                    { value: "object", label: "Object" },
+                    { value: "null", label: "Null" },
+                    { value: "undefined", label: "Undefined" }
+                ]},
+                { name: "stringValue", type: "string", label: "String Value:" },
+                { name: "numberValue", type: "number", label: "Number Value:" },
+                { name: "booleanValue", type: "boolean", label: "Boolean Value:" },
+                { name: "arrayValue", type: "multiline", label: "Array Value (JSON):", rows: 3 },
+                { name: "objectValue", type: "multiline", label: "Object Value (JSON):", rows: 3 }
+            ],
+            dataOutputs: [
+                { name: "output", type: "any", label: "Value" }
+            ],
+            toCode: function(block) {
+                return "";
+            },
+            getValue: function(block) {
+                const valueType = block.data.valueType || "string";
+                
+                switch(valueType) {
+                    case "string":
+                        return `"${(block.data.stringValue || "").replace(/"/g, '\\"')}"`;
+                    case "number":
+                        return String(block.data.numberValue || 0);
+                    case "boolean":
+                        return block.data.booleanValue === true ? "true" : "false";
+                    case "array":
+                        return block.data.arrayValue || "[]";
+                    case "object":
+                        return block.data.objectValue || "{}";
+                    case "null":
+                        return "null";
+                    case "undefined":
+                        return "undefined";
+                    default:
+                        return '""';
+                }
+            }
+        },
+
+        "boolean_value": {
+            type: "boolean_value",
+            label: "Boolean Value",
+            color: "#84cc16", // Lime
+            category: "Input/Output",
+            hasFlowIn: false,
+            hasFlowOut: false,
+            inputs: [
+                { name: "value", type: "boolean", label: "Value:" }
+            ],
+            dataOutputs: [
+                { name: "output", type: "boolean", label: "Output" }
+            ],
+            toCode: function(block) {
+                return "";
+            },
+            getValue: function(block) {
+                return block.data.value === true ? "true" : "false";
+            }
+        },
+
+        "string_operation": {
+            type: "string_operation",
+            label: "String Operation",
+            color: "#10b981", // Emerald
+            category: "Strings",
+            hasFlowIn: false,
+            hasFlowOut: false,
+            inputs: [
+                { name: "string", type: "string", label: "String:" },
+                { name: "operation", type: "select", label: "Operation:", 
+                options: [
+                    { value: "toUpperCase", label: "To Upper Case" },
+                    { value: "toLowerCase", label: "To Lower Case" },
+                    { value: "trim", label: "Trim" },
+                    { value: "substring", label: "Substring" }
+                ]},
+                { name: "param1", type: "string", label: "Parameter 1 (optional):" },
+                { name: "param2", type: "string", label: "Parameter 2 (optional):" }
+            ],
+            dataInputs: [
+                { name: "input_string", type: "string", label: "String" }
+            ],
+            dataOutputs: [
+                { name: "result", type: "string", label: "Result" }
+            ],
+            toCode: function(block) {
+                return "";
+            },
+            getValue: function(block) {
+                let string = null;
+                
+                if (typeof getConnectedValue === 'function') {
+                    string = getConnectedValue(block, "input_string");
+                }
+                
+                if (string === null || string === undefined) {
+                    string = block.data.string || '""';
+                }
+                
+                const operation = block.data.operation || "toUpperCase";
+                const param1 = block.data.param1 || "";
+                const param2 = block.data.param2 || "";
+                
+                if (operation === "substring" && param1) {
+                    return param2 ? `${string}.${operation}(${param1}, ${param2})` : `${string}.${operation}(${param1})`;
+                } else {
+                    return `${string}.${operation}()`;
+                }
+            }
+        },
+
+        "object_property": {
+            type: "object_property",
+            label: "Object Property",
+            color: "#14b8a6", // Teal
+            category: "Objects",
+            hasFlowIn: false,
+            hasFlowOut: false,
+            inputs: [
+                { name: "objectName", type: "string", label: "Object Name:" },
+                { name: "propertyName", type: "string", label: "Property Name:" }
+            ],
+            dataInputs: [
+                { name: "object_input", type: "object", label: "Object" }
+            ],
+            dataOutputs: [
+                { name: "value", type: "any", label: "Value" }
+            ],
+            toCode: function(block) {
+                return "";
+            },
+            getValue: function(block) {
+                let objectName = null;
+                
+                if (typeof getConnectedValue === 'function') {
+                    objectName = getConnectedValue(block, "object_input");
+                }
+                
+                if (objectName === null || objectName === undefined) {
+                    objectName = block.data.objectName || "obj";
+                }
+                
+                const propertyName = block.data.propertyName || "prop";
+                return `${objectName}.${propertyName}`;
+            }
+        },
+
+        "class_definition": {
+            type: "class_definition",
+            label: "Class Definition",
+            color: "#0e7490", // Teal
+            category: "Objects", 
+            hasFlowIn: true,
+            hasFlowOut: false,
+            hasNextFlowOut: true,
+            hasBranchFlowOut: true,
+            isContainer: true,
+            inputs: [
+                { name: "className", type: "string", label: "Class Name:" }
+            ],
+            toCode: function(block, nextBlockCode, childrenCode) {
+                const className = block.data.className || "MyClass";
+                let code = `class ${className} {\n`;
+                
+                if (childrenCode) {
+                    code += childrenCode.split('\n').map(line => `  ${line}`).join('\n');
+                    if (!childrenCode.endsWith('\n')) code += '\n';
+                }
+                
+                code += `}\n`;
+                return code;
+            }
+        },
+
+        "constructor_definition": {
+            type: "constructor_definition",
+            label: "Constructor",
+            color: "#0369a1", // Blue
+            category: "Objects", 
+            hasFlowIn: true,
+            hasFlowOut: false,
+            hasNextFlowOut: true,
+            hasBranchFlowOut: true,
+            isContainer: true,
+            inputs: [
+                { name: "params", type: "string", label: "Parameters (comma-separated):" }
+            ],
+            toCode: function(block, nextBlockCode, childrenCode) {
+                const params = block.data.params || "";
+                let code = `constructor(${params}) {\n`;
+                
+                if (childrenCode) {
+                    code += childrenCode.split('\n').map(line => `  ${line}`).join('\n');
+                    if (!childrenCode.endsWith('\n')) code += '\n';
+                }
+                
+                code += "}\n";
+                return code;
+            }
+        },
+
+        "function_definition": {
+            type: "function_definition",
+            label: "Function Definition",
+            color: "#7e22ce", // Indigo
+            category: "Functions", 
+            hasFlowIn: true,
+            hasFlowOut: false,
+            hasNextFlowOut: true,
+            hasBranchFlowOut: true,
+            isContainer: true,
+            inputs: [
+                { name: "funcName", type: "string", label: "Function Name:" },
+                { name: "params", type: "string", label: "Parameters (comma-separated):" }
+            ],
+            toCode: function(block, nextBlockCode, childrenCode) {
+                const funcName = block.data.funcName || "myFunction";
+                const params = block.data.params || "";
+                let code = `function ${funcName}(${params}) {\n`;
+                
+                if (childrenCode) {
+                    code += childrenCode.split('\n').map(line => `  ${line}`).join('\n');
+                    if (!childrenCode.endsWith('\n')) code += '\n';
+                }
+                
+                code += "}\n";
+                return code;
+            }
+        },
+
+        "method_definition": {
+            type: "method_definition",
+            label: "Method Definition",
+            color: "#0891b2", // Cyan
+            category: "Objects", 
+            hasFlowIn: true,
+            hasFlowOut: false,
+            hasNextFlowOut: true,
+            hasBranchFlowOut: true,
+            isContainer: true,
+            inputs: [
+                { name: "methodName", type: "string", label: "Method Name:" },
+                { name: "params", type: "string", label: "Parameters (comma-separated):" }
+            ],
+            toCode: function(block, nextBlockCode, childrenCode) {
+                const methodName = block.data.methodName || "myMethod";
+                const params = block.data.params || "";
+                let code = `${methodName}(${params}) {\n`;
+                
+                if (childrenCode) {
+                    code += childrenCode.split('\n').map(line => `  ${line}`).join('\n');
+                    if (!childrenCode.endsWith('\n')) code += '\n';
+                }
+                
+                code += "}\n";
+                return code;
+            }
+        },
+
+        "function_call": {
+            type: "function_call",
+            label: "Function Call",
+            color: "#6366f1", // Indigo
+            category: "Functions",
+            hasFlowIn: true,
+            hasFlowOut: false,
+            hasNextFlowOut: true,
+            hasBranchFlowOut: true,
+            inputs: [
+                { name: "funcName", type: "string", label: "Function Name:" },
+                { name: "params", type: "string", label: "Parameters (comma-separated):" }
+            ],
+            dataInputs: [
+                { name: "function_input", type: "function", label: "Function" },
+                { name: "params_input", type: "any", label: "Parameters" }
+            ],
+            dataOutputs: [
+                { name: "return_value", type: "any", label: "Return Value" }
+            ],
+            toCode: function(block) {
+                let funcName = null;
+                let params = null;
+                
+                if (typeof getConnectedValue === 'function') {
+                    funcName = getConnectedValue(block, "function_input");
+                    params = getConnectedValue(block, "params_input");
+                }
+                
+                if (funcName === null || funcName === undefined) {
+                    funcName = block.data.funcName || "myFunction";
+                }
+                if (params === null || params === undefined) {
+                    params = block.data.params || "";
+                }
+                
+                return `${funcName}(${params});\n`;
+            }
+        },
+
+        "return_statement": {
+            type: "return_statement",
+            label: "Return Statement",
+            color: "#6366f1", // Indigo
+            category: "Functions",
+            hasFlowIn: true,
+            hasFlowOut: false,
+            inputs: [
+                { name: "value", type: "string", label: "Return Value:" }
+            ],
+            dataInputs: [
+                { name: "return_value", type: "any", label: "Value" }
+            ],
+            toCode: function(block) {
+                // Try to get connected value first
+                let value = null;
+                if (typeof getConnectedValue === 'function') {
+                    value = getConnectedValue(block, "return_value");
+                }
+                
+                // Fall back to text input field
+                if (value === null || value === undefined) {
+                    value = block.data.value || "";
+                }
+                
+                return `return ${value};\n`;
+            }
+        },
+
+        "array_operation": {
+            type: "array_operation",
+            label: "Array Operation",
+            color: "#eab308", // Yellow
+            category: "Arrays",
+            hasFlowIn: true,
+            hasFlowOut: false,
+            hasNextFlowOut: true,
+            inputs: [
+                { name: "arrayName", type: "string", label: "Array Name:" },
+                { name: "operation", type: "select", label: "Operation:", 
+                options: [
+                    { value: "push", label: "Push" },
+                    { value: "pop", label: "Pop" },
+                    { value: "shift", label: "Shift" },
+                    { value: "unshift", label: "Unshift" },
+                    { value: "sort", label: "Sort" },
+                    { value: "reverse", label: "Reverse" }
+                ]},
+                { name: "value", type: "string", label: "Value (for push/unshift):" }
+            ],
+            dataInputs: [
+                { name: "array_input", type: "array", label: "Array" },
+                { name: "value_input", type: "any", label: "Value" }
+            ],
+            toCode: function(block) {
+                let arrayName = null;
+                let value = null;
+                
+                if (typeof getConnectedValue === 'function') {
+                    arrayName = getConnectedValue(block, "array_input");
+                    value = getConnectedValue(block, "value_input");
+                }
+                
+                if (arrayName === null || arrayName === undefined) {
+                    arrayName = block.data.arrayName || "myArray";
+                }
+                if (value === null || value === undefined) {
+                    value = block.data.value || "";
+                }
+                
+                const operation = block.data.operation || "push";
+                
+                if (["push", "unshift"].includes(operation) && value) {
+                    return `${arrayName}.${operation}(${value});\n`;
+                } else {
+                    return `${arrayName}.${operation}();\n`;
+                }
+            }
+        },
+
         "try_catch": {
             type: "try_catch",
             label: "Try-Catch",
             color: "#b91c1c", // Dark red
             category: "Flow Control",
             hasFlowIn: true,
-            hasFlowOut: true,
-            hasTryBranchFlowOut: true,    // For the try branch
-            hasCatchBranchFlowOut: true,  // For the catch branch
-            isContainer: true, // Mark as container to properly handle nesting
+            hasFlowOut: false,
+            hasNextFlowOut: true,
+            hasTryBranchFlowOut: true,
+            hasCatchBranchFlowOut: true,
+            isContainer: true,
             inputs: [
                 { name: "errorName", type: "string", label: "Error Variable Name:" }
             ],
-            outputs: [],
             toCode: function(block, nextBlockCode, tryBlockCode, catchBlockCode) {
                 const errorName = block.data.errorName || "error";
                 
@@ -842,15 +994,15 @@ if (typeof BLOCK_DEFINITIONS === 'undefined') {
                 return code;
             }
         },
-        
-        // DOM Element Access
+
         "dom_element": {
             type: "dom_element",
             label: "DOM Element",
             color: "#84cc16", // Lime
             category: "Input/Output",
             hasFlowIn: true,
-            hasFlowOut: true,
+            hasFlowOut: false,
+            hasNextFlowOut: true,
             inputs: [
                 { name: "method", type: "select", label: "Selection Method:", 
                 options: [
@@ -862,33 +1014,29 @@ if (typeof BLOCK_DEFINITIONS === 'undefined') {
                 { name: "selector", type: "string", label: "Selector:" },
                 { name: "variable", type: "string", label: "Variable Name:" }
             ],
-            outputs: [],
+            dataOutputs: [
+                { name: "element", type: "element", label: "Element" }
+            ],
             toCode: function(block) {
                 const method = block.data.method || "getElementById";
                 const selector = block.data.selector || "";
                 const variable = block.data.variable || "element";
                 
-                // Format selector based on method (add quotes for string methods)
-                let formattedSelector = selector;
-                if (method !== "getElementById" && method !== "getElementsByTagName") {
-                    formattedSelector = `"${selector.replace(/"/g, '\\"')}"`;
-                } else {
-                    formattedSelector = `"${selector}"`;
-                }
+                const formattedSelector = `"${selector}"`;
                 
                 return `const ${variable} = document.${method}(${formattedSelector});\n`;
             }
         },
-        
-        // Event Listener
+
         "event_listener": {
             type: "event_listener",
             label: "Event Listener",
             color: "#84cc16", // Lime
             category: "Input/Output",
             hasFlowIn: true,
-            hasFlowOut: true,
-            isContainer: true, // Mark as container for event handler content
+            hasFlowOut: false,
+            hasNextFlowOut: true,
+            isContainer: true,
             inputs: [
                 { name: "element", type: "string", label: "Element Variable:" },
                 { name: "event", type: "select", label: "Event Type:", 
@@ -903,14 +1051,24 @@ if (typeof BLOCK_DEFINITIONS === 'undefined') {
                     { value: "mouseout", label: "Mouse Out" }
                 ]}
             ],
-            outputs: [],
+            dataInputs: [
+                { name: "element_input", type: "element", label: "Element" }
+            ],
             toCode: function(block, nextBlockCode, childrenCode) {
-                const element = block.data.element || "element";
+                let element = null;
+                
+                if (typeof getConnectedValue === 'function') {
+                    element = getConnectedValue(block, "element_input");
+                }
+                
+                if (element === null || element === undefined) {
+                    element = block.data.element || "element";
+                }
+                
                 const event = block.data.event || "click";
                 
                 let code = `${element}.addEventListener("${event}", (event) => {\n`;
                 
-                // Add child content if any
                 if (childrenCode) {
                     code += childrenCode.split('\n').map(line => `  ${line}`).join('\n');
                     if (!childrenCode.endsWith('\n')) code += '\n';
@@ -920,16 +1078,16 @@ if (typeof BLOCK_DEFINITIONS === 'undefined') {
                 return code;
             }
         },
-        
-        // Timer
+
         "timer": {
             type: "timer",
             label: "Timer",
             color: "#0369a1", // Blue
             category: "Flow Control",
             hasFlowIn: true,
-            hasFlowOut: true,
-            isContainer: true, // Mark as container for timer callback content
+            hasFlowOut: false,
+            hasNextFlowOut: true,
+            isContainer: true,
             inputs: [
                 { name: "type", type: "select", label: "Timer Type:", 
                 options: [
@@ -939,17 +1097,26 @@ if (typeof BLOCK_DEFINITIONS === 'undefined') {
                 { name: "delay", type: "number", label: "Delay (ms):" },
                 { name: "variable", type: "string", label: "Timer Variable Name:" }
             ],
-            outputs: [],
+            dataInputs: [
+                { name: "delay_input", type: "number", label: "Delay" }
+            ],
             toCode: function(block, nextBlockCode, childrenCode) {
                 const type = block.data.type || "timeout";
-                const delay = block.data.delay || 1000;
                 const variable = block.data.variable || "timer";
                 
-                let funcName = type === "timeout" ? "setTimeout" : "setInterval";
+                let delay = null;
+                if (typeof getConnectedValue === 'function') {
+                    delay = getConnectedValue(block, "delay_input");
+                }
+                
+                if (delay === null || delay === undefined) {
+                    delay = block.data.delay || 1000;
+                }
+                
+                const funcName = type === "timeout" ? "setTimeout" : "setInterval";
                 
                 let code = `const ${variable} = ${funcName}(() => {\n`;
                 
-                // Add child content if any
                 if (childrenCode) {
                     code += childrenCode.split('\n').map(line => `  ${line}`).join('\n');
                     if (!childrenCode.endsWith('\n')) code += '\n';
@@ -959,30 +1126,41 @@ if (typeof BLOCK_DEFINITIONS === 'undefined') {
                 return code;
             }
         },
-        
-        // Switch Statement
+
         "switch_statement": {
             type: "switch_statement",
             label: "Switch Statement",
             color: "#f59e0b", // Amber
             category: "Flow Control",
             hasFlowIn: true,
-            hasFlowOut: true,
-            isContainer: true, // Mark as container for switch content
+            hasFlowOut: false,
+            hasNextFlowOut: true,
+            hasBranchFlowOut: true,
+            isContainer: true,
             inputs: [
                 { name: "expression", type: "string", label: "Expression:" },
                 { name: "cases", type: "multiline", label: "Cases (one per line):", rows: 5 },
                 { name: "hasDefault", type: "boolean", label: "Include Default Case:" }
             ],
-            outputs: [],
+            dataInputs: [
+                { name: "expression_input", type: "any", label: "Expression" }
+            ],
             toCode: function(block, nextBlockCode, childrenCode) {
-                const expression = block.data.expression || "value";
+                let expression = null;
+                
+                if (typeof getConnectedValue === 'function') {
+                    expression = getConnectedValue(block, "expression_input");
+                }
+                
+                if (expression === null || expression === undefined) {
+                    expression = block.data.expression || "value";
+                }
+                
                 const cases = block.data.cases || "";
                 const hasDefault = block.data.hasDefault === true;
                 
                 let code = `switch (${expression}) {\n`;
                 
-                // Process cases
                 const caseLines = cases.split('\n').filter(line => line.trim() !== '');
                 caseLines.forEach(caseLine => {
                     code += `  case ${caseLine}:\n`;
@@ -990,7 +1168,6 @@ if (typeof BLOCK_DEFINITIONS === 'undefined') {
                     code += `    break;\n`;
                 });
                 
-                // Add default case if needed
                 if (hasDefault) {
                     code += `  default:\n`;
                     code += `    // Default case\n`;
@@ -1001,16 +1178,16 @@ if (typeof BLOCK_DEFINITIONS === 'undefined') {
                 return code;
             }
         },
-        
-        // Fetch/API Request
+
         "fetch_request": {
             type: "fetch_request",
             label: "Fetch API Request",
             color: "#0284c7", // Sky blue
             category: "Input/Output",
             hasFlowIn: true,
-            hasFlowOut: true,
-            isContainer: true, // Mark as container for fetch callback content
+            hasFlowOut: false,
+            hasNextFlowOut: true,
+            isContainer: true,
             inputs: [
                 { name: "url", type: "string", label: "URL:" },
                 { name: "method", type: "select", label: "Method:", 
@@ -1023,12 +1200,28 @@ if (typeof BLOCK_DEFINITIONS === 'undefined') {
                 { name: "headers", type: "multiline", label: "Headers (JSON):", rows: 3 },
                 { name: "body", type: "multiline", label: "Body (JSON):", rows: 3 }
             ],
-            outputs: [],
+            dataInputs: [
+                { name: "url_input", type: "string", label: "URL" },
+                { name: "body_input", type: "object", label: "Body" }
+            ],
             toCode: function(block, nextBlockCode, childrenCode) {
-                const url = block.data.url || "https://example.com/api";
+                let url = null;
+                let body = null;
+                
+                if (typeof getConnectedValue === 'function') {
+                    url = getConnectedValue(block, "url_input");
+                    body = getConnectedValue(block, "body_input");
+                }
+                
+                if (url === null || url === undefined) {
+                    url = block.data.url || "https://example.com/api";
+                }
+                if (body === null || body === undefined) {
+                    body = block.data.body || "";
+                }
+                
                 const method = block.data.method || "GET";
                 const headers = block.data.headers || "{}";
-                const body = block.data.body || "";
                 
                 let options = `{ method: "${method}", headers: ${headers}`;
                 if (body && method !== "GET") {
@@ -1040,7 +1233,6 @@ if (typeof BLOCK_DEFINITIONS === 'undefined') {
                 code += `  .then(response => response.json())\n`;
                 code += `  .then(data => {\n`;
                 
-                // Add child content if any
                 if (childrenCode) {
                     code += childrenCode.split('\n').map(line => `    ${line}`).join('\n');
                     if (!childrenCode.endsWith('\n')) code += '\n';

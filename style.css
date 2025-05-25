@@ -1251,3 +1251,109 @@ body {
 .connector-else-branch:hover {
     background-color: #ea580c;
 }
+
+.connector-next {
+    background-color: #10b981 !important; /* Green for next connectors */
+    border-color: #059669 !important;
+}
+
+.connector-next .connector-text {
+    font-size: 10px;
+    font-weight: bold;
+    color: white;
+}
+
+.connector-next:hover {
+    background-color: #059669 !important;
+}
+
+#toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background-color: #1a202c;
+        padding: 10px 15px;
+        border-bottom: 1px solid #4a5568;
+        color: #e2e8f0;
+    }
+    
+    .logo {
+        font-size: 1.2rem;
+        font-weight: bold;
+        color: #81e6d9;
+        text-shadow: 0 0 10px rgba(129, 230, 217, 0.5);
+    }
+    
+    .toolbar-buttons {
+        display: flex;
+        gap: 10px;
+    }
+    
+    .toolbar-right {
+        display: flex;
+        gap: 10px;
+    }
+    
+    #toolbar button {
+        background-color: #2d3748;
+        color: #e2e8f0;
+        border: 1px solid #4a5568;
+        border-radius: 4px;
+        padding: 6px 12px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        transition: all 0.2s;
+    }
+    
+    #toolbar button:hover {
+        background-color: #4a5568;
+    }
+    
+    #show-tutorial-btn {
+        background-color: #4299e1;
+        border-color: #3182ce;
+    }
+    
+    #show-tutorial-btn:hover {
+        background-color: #3182ce;
+    }
+    
+    /* Body connector styling */
+    .connector-child {
+        background-color: #f59e0b !important; /* Amber for body input connectors */
+        border-color: #d97706 !important;
+    }
+
+    .connector-child .connector-text {
+        font-size: 10px;
+        font-weight: bold;
+        color: white;
+        font-family: monospace; /* Better display for {...} */
+        text-shadow: 0 0 1px rgba(0, 0, 0, 0.5);
+    }
+
+    .connector-child:hover {
+        background-color: #d97706 !important;
+    }
+
+    /* Next connector styling */
+    .connector-next {
+        background-color: #10b981 !important; /* Green for next connectors */
+        border-color: #059669 !important;
+    }
+
+    .connector-next .connector-text {
+        font-size: 10px;
+        font-weight: bold;
+        color: white;
+    }
+
+    .connector-next:hover {
+        background-color: #059669 !important;
+    }
+    
+    /* Ensure app container takes remaining height */
+    #app-container {
+        height: calc(100vh - 51px); /* Subtract toolbar height + border */
+    }
+
