@@ -213,6 +213,32 @@ class ScriptFlowModal {
         
         document.head.appendChild(styleEl);
     }
+
+    handleFileOpen() {
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = '.json';
+        fileInput.style.display = 'none';
+        
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    // Send file contents to iframe
+                    this.iframe.contentWindow.postMessage({
+                        action: 'loadProject',
+                        fileContents: e.target.result
+                    }, '*');
+                };
+                reader.readAsText(file);
+            }
+            document.body.removeChild(fileInput);
+        });
+        
+        document.body.appendChild(fileInput);
+        fileInput.click();
+    }
     
     // Handle ESC key press
     handleEscKey = (e) => {
@@ -221,7 +247,7 @@ class ScriptFlowModal {
         }
     }
     
-    // Handle messages from the iframe
+    // Handle messages from the iframe - FIXED VERSION
     handleMessage = (event) => {
         // Make sure the message is from our iframe
         if (event.source === this.iframe.contentWindow) {
@@ -230,6 +256,9 @@ class ScriptFlowModal {
             if (action === 'generatedCode' && this.options.onSave) {
                 this.options.onSave(code);
                 this.close();
+            } else if (action === 'openProject') {
+                // Handle file opening in parent window
+                this.handleFileOpen();
             }
         }
     }

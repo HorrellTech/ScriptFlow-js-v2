@@ -33,20 +33,38 @@ if (typeof BLOCK_DEFINITIONS === 'undefined') {
                 return `/*\n${comment ? ": " + comment : ""}\n*/\n`;
             }
         },
-        "log": {
-            type: "log",
-            label: "Log Message",
+        "console": {
+            type: "console",
+            label: "Log Console Message",
             color: "#3b82f6", // Blue
             category: "Input/Output",
             hasFlowIn: true,
             hasFlowOut: true,
             inputs: [
-                { name: "message", type: "multiline", label: "Message:", rows: 2 }
+                { name: "message", type: "multiline", label: "Message:", rows: 2 },
+                // Add dropdown for log level if needed
+                { name: "logLevel", type: "select", label: "Log Level:",
+                options: [
+                    { value: "info", label: "Info" },
+                    { value: "warn", label: "Warning" },
+                    { value: "error", label: "Error" },
+                    { value: "debug", label: "Debug" }
+                ]}
             ],
             outputs: [],
             toCode: function(block) {
                 const message = block.data.message || "";
-                return `console.log("${message.replace(/"/g, '\\"')}");\n`;
+                const logLevel = block.data.logLevel || "info";
+                // Format message based on log level
+                if (logLevel === "warn") {
+                    return `console.warn("${message.replace(/"/g, '\\"')}");\n`;
+                } else if (logLevel === "error") {
+                    return `console.error("${message.replace(/"/g, '\\"')}");\n`;
+                } else if (logLevel === "debug") {
+                    return `console.debug("${message.replace(/"/g, '\\"')}");\n`;
+                } else {
+                    return `console.log("${message.replace(/"/g, '\\"')}");\n`;
+                }
             }
         },
         "variable_declare": {
@@ -97,6 +115,64 @@ if (typeof BLOCK_DEFINITIONS === 'undefined') {
                 return `let ${varName} = ${formattedValue};\n`;
             }
         },
+        "log_message": {
+            type: "log_message",
+            label: "Log Message",
+            color: "#3b82f6", // Blue
+            category: "Input/Output",
+            hasFlowIn: true,
+            hasFlowOut: true,
+            inputs: [
+                { name: "message", type: "string", label: "Message:" }
+            ],
+            dataInputs: [
+                { name: "input_message", type: "any", label: "Message" }
+            ],
+            outputs: [],
+            toCode: function(block) {
+                // Check if there's a connected input value first
+                let message;
+                
+                // Try to get connected value using the global getConnectedValue function
+                if (typeof getConnectedValue === 'function') {
+                    const connectedValue = getConnectedValue(block, "input_message");
+                    message = connectedValue || block.data.message || "";
+                } else {
+                    message = block.data.message || "";
+                }
+                
+                // If the message is already a quoted string or expression, use it directly
+                if (typeof message === 'string' && (message.startsWith('"') || message.startsWith("'") || message.includes('('))) {
+                    return `console.log(${message});\n`;
+                } else {
+                    // Otherwise, wrap it in quotes
+                    return `console.log("${String(message).replace(/"/g, '\\"')}");\n`;
+                }
+            }
+        },
+        "variable_get": {
+            type: "variable_get",
+            label: "Get Variable",
+            color: "#a855f7", // Purple
+            category: "Variables",
+            hasFlowIn: false, // Not part of the flow
+            hasFlowOut: false, // Not part of the flow
+            inputs: [
+                { name: "varName", type: "string", label: "Variable Name:" }
+            ],
+            dataOutputs: [
+                { name: "value", type: "any", label: "Value" }
+            ],
+            toCode: function(block) {
+                // This block provides a value, doesn't generate standalone code
+                return "";
+            },
+            // Helper function to get the actual value for use in connections
+            getValue: function(block) {
+                return block.data.varName || "myVar";
+            }
+        },
+
         "if_condition": {
             type: "if_condition",
             label: "If Condition",
@@ -114,16 +190,77 @@ if (typeof BLOCK_DEFINITIONS === 'undefined') {
             inputs: [ 
                 { name: "condition_text", type: "string", label: "Condition (text fallback):" }
             ],
-            outputs: [], // Data outputs if any
+            outputs: [
+                // we need an else branch output to handle the 'else' case
+                { name: "else_branch", type: "flow", label: "Else Branch" }
+            ], // Data outputs if any
             toCode: function(block, nextBlockCode, branchBlockCode) {
-                // Use the condition set by code generation function
-                const condition = block.data.condition || block.data.condition_text || "true";
+                // FIXED: Get the connected value properly
+                let condition = "true";
+                
+                // First try to get from connected data input
+                if (typeof getConnectedValue === 'function') {
+                    const connectedCondition = getConnectedValue(block, "condition");
+                    if (connectedCondition !== null) {
+                        condition = connectedCondition;
+                    } else {
+                        // Fall back to text input
+                        condition = block.data.condition_text || "true";
+                    }
+                } else {
+                    // Fall back to text input if getConnectedValue not available
+                    condition = block.data.condition_text || "true";
+                }
                 
                 let code = `if (${condition}) {\n`;
                 if (branchBlockCode) {
-                    code += branchBlockCode.split('\n').map(line => `  ${line}`).join('\n').trimEnd() + "\n";
+                    code += branchBlockCode.split('\n').map(line => line ? `  ${line}` : line).join('\n').trimEnd() + "\n";
                 }
                 code += `}\n`;
+                return code;
+            }
+        },
+
+        "multi_condition": {
+            type: "multi_condition",
+            label: "Multi Condition",
+            color: "#f59e0b",
+            category: "Flow Control",
+            hasFlowIn: true,
+            hasFlowOut: false, // No default flow out
+            isContainer: true,
+            
+            // Multiple data inputs
+            dataInputs: [
+                { name: "condition1", type: "boolean", label: "Condition 1" },
+                { name: "condition2", type: "boolean", label: "Condition 2" },
+                { name: "value", type: "any", label: "Value", position: { top: "80px" } }
+            ],
+            
+            // Multiple flow outputs
+            flowOutputs: [
+                { name: "case1", label: "Case 1" },
+                { name: "case2", label: "Case 2" },
+                { name: "default", label: "Default" }
+            ],
+            
+            // Custom toCode that handles all the connectors
+            toCode: function(block, nextBlockCode, branchBlockCode) {
+                // Get connected values for each input
+                const condition1 = getConnectedValue(block, "condition1") || "false";
+                const condition2 = getConnectedValue(block, "condition2") || "false";
+                const value = getConnectedValue(block, "value") || "null";
+                
+                // Generate code based on connected outputs
+                let code = `// Multi-condition check with value: ${value}\n`;
+                code += `if (${condition1}) {\n`;
+                code += `  // Case 1 code would go here\n`;
+                code += `} else if (${condition2}) {\n`;
+                code += `  // Case 2 code would go here\n`;
+                code += `} else {\n`;
+                code += `  // Default case code would go here\n`;
+                code += `}\n`;
+                
                 return code;
             }
         },
@@ -132,8 +269,8 @@ if (typeof BLOCK_DEFINITIONS === 'undefined') {
         "boolean_value": {
             type: "boolean_value",
             label: "Boolean Value",
-            color: "#4c1d95", // Deep purple
-            category: "Logic", 
+            color: "#84cc16", // Lime (matching Input/Output category)
+            category: "Input/Output", // Changed from "Logic" to match the new Value block
             hasFlowIn: false, // Not part of the flow
             hasFlowOut: false, // Not part of the flow
             inputs: [
@@ -334,7 +471,7 @@ if (typeof BLOCK_DEFINITIONS === 'undefined') {
             category: "Flow Control",
             hasFlowIn: true,
             hasFlowOut: true,
-            hasBranchFlowOut: true, // For the 'true' branch
+            hasBranchFlowOut: true, // For the 'true' branch 
             hasElseBranchFlowOut: true, // For the 'else' branch
             isContainer: true, // Mark as container to properly handle nesting
             dataInputs: [
@@ -413,6 +550,100 @@ if (typeof BLOCK_DEFINITIONS === 'undefined') {
             toCode: function(block) {
                 // This block provides a value, doesn't generate standalone code
                 return "";
+            }
+        },
+
+        // Value Definition Block
+        "value_definition": {
+            type: "value_definition",
+            label: "Value",
+            color: "#84cc16", // Lime (matching Input/Output category)
+            category: "Input/Output",
+            hasFlowIn: false, // Not part of the flow - just provides values
+            hasFlowOut: false, // Not part of the flow
+            inputs: [
+                { name: "valueType", type: "select", label: "Value Type:", 
+                options: [
+                    { value: "string", label: "String" },
+                    { value: "number", label: "Number" },
+                    { value: "boolean", label: "Boolean" },
+                    { value: "array", label: "Array" },
+                    { value: "object", label: "Object" },
+                    { value: "null", label: "Null" },
+                    { value: "undefined", label: "Undefined" }
+                ]},
+                { name: "stringValue", type: "string", label: "String Value:" },
+                { name: "numberValue", type: "number", label: "Number Value:" },
+                { name: "booleanValue", type: "boolean", label: "Boolean Value:" },
+                { name: "arrayValue", type: "multiline", label: "Array Value (JSON):", rows: 3 },
+                { name: "objectValue", type: "multiline", label: "Object Value (JSON):", rows: 3 }
+            ],
+            // Data output connector on the right
+            dataOutputs: [
+                { name: "output", type: "any", label: "Value" }
+            ],
+            toCode: function(block) {
+                // This block provides a value, doesn't generate standalone code
+                // The actual value will be used when connected to other blocks
+                const valueType = block.data.valueType || "string";
+                
+                switch(valueType) {
+                    case "string":
+                        return `"${(block.data.stringValue || "").replace(/"/g, '\\"')}"`;
+                    case "number":
+                        return String(block.data.numberValue || 0);
+                    case "boolean":
+                        return String(block.data.booleanValue === true);
+                    case "array":
+                        try {
+                            return block.data.arrayValue || "[]";
+                        } catch (e) {
+                            return "[]";
+                        }
+                    case "object":
+                        try {
+                            return block.data.objectValue || "{}";
+                        } catch (e) {
+                            return "{}";
+                        }
+                    case "null":
+                        return "null";
+                    case "undefined":
+                        return "undefined";
+                    default:
+                        return '""';
+                }
+            },
+            // Helper function to get the actual value for use in connections
+            getValue: function(block) {
+                const valueType = block.data.valueType || "string";
+                
+                switch(valueType) {
+                    case "string":
+                        return `"${(block.data.stringValue || "").replace(/"/g, '\\"')}"`;
+                    case "number":
+                        return String(block.data.numberValue || 0);
+                    case "boolean":
+                        return block.data.booleanValue === true ? "true" : "false";
+                    case "array":
+                        try {
+                            return block.data.arrayValue || "[]";
+                        } catch (e) {
+                            return "[]";
+                        }
+                    case "object":
+                        try {
+                            return block.data.objectValue || "{}";
+                        } catch (e) {
+                            return "{}";
+                        }
+                    case "null":
+                        return "null";
+                    case "undefined":
+                        return "undefined";
+                    default:
+                        return '""';
+                }
             }
         },
         

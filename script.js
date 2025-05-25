@@ -1,4 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // Make getConnectedValue available globally for blocks.js
+    window.getConnectedValue = getConnectedValue;
+
      // Check if we're running in modal mode
     const isModalMode = window.SCRIPTFLOW_MODAL_MODE === true;
     
@@ -134,6 +137,28 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
     document.head.appendChild(style);
 
+    // Listen for messages from parent window (modal mode)
+    window.addEventListener('message', (event) => {
+        const { action, fileContents } = event.data;
+        
+        if (action === 'loadProject' && fileContents) {
+            // Process the project file contents sent from parent
+            try {
+                processProjectFile(fileContents);
+            } catch (error) {
+                console.error("Error loading project from parent:", error);
+                alert("Error loading project file. The file may be corrupted or in an incompatible format.");
+            }
+        } else if (action === 'getGeneratedCode') {
+            // Parent is requesting the generated code
+            const generatedCode = document.getElementById('generated-code').textContent;
+            window.parent.postMessage({
+                action: 'generatedCode',
+                code: generatedCode
+            }, '*');
+        }
+    });
+
     const workspace = document.getElementById('workspace');
     const blockPalette = document.getElementById('block-palette');
     const generateCodeBtn = document.getElementById('generate-code-btn');
@@ -177,161 +202,161 @@ document.addEventListener('DOMContentLoaded', () => {
     let tutorialStep = 0;
     let tutorialTooltip = null;
     const tutorialSteps = [
-        {
-            target: '.category-flow-control',
-            message: 'Welcome to ScriptFlow! Let\'s start by clicking on "Flow Control" to expand blocks',
-            position: 'right'
-        },
-        {
-            target: '[data-block-type="start"]',
-            message: 'Drag a "Start" block to the workspace - this is the entry point of your program',
-            position: 'right'
-        },
-        {
-            target: '.category-objects',
-            message: 'Now click on "Objects" to see object-oriented programming blocks',
-            position: 'right',
-            waitForAction: element => element.querySelector('.category-content.collapsed') !== null,
-            autoAdvance: false
-        },
-        {
-            target: '[data-block-type="class_definition"]',
-            message: 'Drag a "Class" block to the workspace - we\'ll build a simple class',
-            position: 'right',
-            waitForBlock: block => block.type === 'class_definition'
-        },
-        {
-            target: '.connector-parent',
-            message: 'Connect the Start block to the Class block by dragging from the Start block\'s output connector to the Class block\'s input connector',
-            position: 'right',
-            waitForConnection: true,
-            highlightConnectors: true
-        },
-        {
-            target: '[data-block-type="class_definition"] input',
-            message: 'Type a name for your class (e.g. "Calculator")',
-            position: 'bottom',
-            waitForAction: element => {
-                const classBlock = blocks.find(b => b.type === 'class_definition');
-                return classBlock && classBlock.data.class_name && classBlock.data.class_name.length > 0;
-            }
-        },
-        {
-            target: '.category-functions',
-            message: 'Click on "Functions" to see function-related blocks',
-            position: 'right',
-            waitForAction: element => element.querySelector('.category-content.collapsed') !== null,
-            autoAdvance: false
-        },
-        {
-            target: '[data-block-type="function_definition"]',
-            message: 'Drag a "Function" block to the workspace - this will be a method in our class',
-            position: 'right',
-            waitForBlock: block => block.type === 'function_definition'
-        },
-        {
-            target: '.connector-parent',
-            message: 'Connect the Class block\'s output connector to the Function block\'s input connector',
-            position: 'right',
-            waitForConnection: conn => {
-                const fromBlock = blocks.find(b => b.id === conn.fromBlockId);
-                const toBlock = blocks.find(b => b.id === conn.toBlockId);
-                return fromBlock && toBlock && 
-                       fromBlock.type === 'class_definition' && 
-                       toBlock.type === 'function_definition';
-            },
-            highlightConnectors: true
-        },
-        {
-            target: '[data-block-type="function_definition"] input',
-            message: 'Name your function (e.g. "calculate")',
-            position: 'bottom',
-            waitForAction: element => {
-                const functionBlock = blocks.find(b => b.type === 'function_definition');
-                return functionBlock && functionBlock.data.function_name && functionBlock.data.function_name.length > 0;
-            }
-        },
-        {
-            target: '.category-logic',
-            message: 'Let\'s add some logic. Click on "Logic" to see logic blocks',
-            position: 'right',
-            waitForAction: element => element.querySelector('.category-content.collapsed') !== null,
-            autoAdvance: false
-        },
-        {
-            target: '[data-block-type="if_condition"]',
-            message: 'Drag an "If Condition" block to the workspace',
-            position: 'right',
-            waitForBlock: block => block.type === 'if_condition'
-        },
-        {
-            target: '.connector-parent',
-            message: 'Connect the Function block\'s output to the If block\'s input',
-            position: 'right',
-            waitForConnection: conn => {
-                const fromBlock = blocks.find(b => b.id === conn.fromBlockId);
-                const toBlock = blocks.find(b => b.id === conn.toBlockId);
-                return fromBlock && toBlock && 
-                       fromBlock.type === 'function_definition' && 
-                       toBlock.type === 'if_condition';
-            },
-            highlightConnectors: true
-        },
-        {
-            target: '[data-block-type="if_condition"] input',
-            message: 'Type a condition (e.g. "x > 0")',
-            position: 'bottom',
-            waitForAction: element => {
-                const ifBlock = blocks.find(b => b.type === 'if_condition');
-                return ifBlock && ifBlock.data.condition_text && ifBlock.data.condition_text.length > 0;
-            }
-        },
-        {
-            target: '.category-input-output',
-            message: 'Finally, add some output. Click on "Input/Output"',
-            position: 'right',
-            waitForAction: element => element.querySelector('.category-content.collapsed') !== null,
-            autoAdvance: false
-        },
-        {
-            target: '[data-block-type="log_message"]',
-            message: 'Drag a "Log Message" block to the workspace',
-            position: 'right',
-            waitForBlock: block => block.type === 'log_message'
-        },
-        {
-            target: '.connector-parent',
-            message: 'Connect the If block\'s "True" branch to the Log Message block',
-            position: 'right',
-            waitForConnection: conn => {
-                const fromBlock = blocks.find(b => b.id === conn.fromBlockId);
-                const toBlock = blocks.find(b => b.id === conn.toBlockId);
-                return fromBlock && toBlock && 
-                       fromBlock.type === 'if_condition' && 
-                       toBlock.type === 'log_message';
-            },
-            highlightConnectors: true
-        },
-        {
-            target: '[data-block-type="log_message"] input',
-            message: 'Type a message to log (e.g. "Condition is true!")',
-            position: 'bottom',
-            waitForAction: element => {
-                const logBlock = blocks.find(b => b.type === 'log_message');
-                return logBlock && logBlock.data.message && logBlock.data.message.length > 0;
-            }
-        },
-        {
-            target: '#generate-code-btn',
-            message: 'Great job! Now click "Generate Code" to see your complete JavaScript program.',
-            position: 'left'
-        },
-        {
-            target: '#generated-code',
-            message: 'You\'ve created a class with a method that includes conditional logic! This is the essence of visual programming with ScriptFlow.',
-            position: 'top'
+    {
+        target: '.category-flow-control',
+        message: 'Welcome to ScriptFlow! Let\'s start by clicking on "Flow Control" to expand blocks',
+        position: 'right'
+    },
+    {
+        target: '[data-block-type="start"]',
+        message: 'Drag a "Start" block to the workspace - this is the entry point of your program',
+        position: 'right'
+    },
+    {
+        target: '.category-objects',
+        message: 'Now click on "Objects" to see object-oriented programming blocks',
+        position: 'right',
+        waitForAction: element => element.querySelector('.category-content.collapsed') !== null,
+        autoAdvance: false
+    },
+    {
+        target: '[data-block-type="class_definition"]',
+        message: 'Drag a "Class Definition" block to the workspace - we\'ll build a simple class',
+        position: 'right',
+        waitForBlock: block => block.type === 'class_definition'
+    },
+    {
+        target: '.connector-parent',
+        message: 'Connect the Start block to the Class block by dragging from the Start block\'s output connector to the Class block\'s input connector',
+        position: 'right',
+        waitForConnection: true,
+        highlightConnectors: true
+    },
+    {
+        target: '[data-block-type="class_definition"] input',
+        message: 'Type a name for your class (e.g. "Calculator")',
+        position: 'bottom',
+        waitForAction: element => {
+            const classBlock = blocks.find(b => b.type === 'class_definition');
+            return classBlock && classBlock.data.className && classBlock.data.className.length > 0;
         }
-    ];
+    },
+    {
+        target: '.category-functions',
+        message: 'Click on "Functions" to see function-related blocks',
+        position: 'right',
+        waitForAction: element => element.querySelector('.category-content.collapsed') !== null,
+        autoAdvance: false
+    },
+    {
+        target: '[data-block-type="function_definition"]',
+        message: 'Drag a "Function Definition" block to the workspace - this will be a method in our class',
+        position: 'right',
+        waitForBlock: block => block.type === 'function_definition'
+    },
+    {
+        target: '.connector-parent',
+        message: 'Connect the Class block\'s output connector to the Function block\'s input connector',
+        position: 'right',
+        waitForConnection: conn => {
+            const fromBlock = blocks.find(b => b.id === conn.fromBlockId);
+            const toBlock = blocks.find(b => b.id === conn.toBlockId);
+            return fromBlock && toBlock && 
+                   fromBlock.type === 'class_definition' && 
+                   toBlock.type === 'function_definition';
+        },
+        highlightConnectors: true
+    },
+    {
+        target: '[data-block-type="function_definition"] input',
+        message: 'Name your function (e.g. "calculate")',
+        position: 'bottom',
+        waitForAction: element => {
+            const functionBlock = blocks.find(b => b.type === 'function_definition');
+            return functionBlock && functionBlock.data.funcName && functionBlock.data.funcName.length > 0;
+        }
+    },
+    {
+        target: '.category-logic',
+        message: 'Let\'s add some logic. Click on "Logic" to see logic blocks',
+        position: 'right',
+        waitForAction: element => element.querySelector('.category-content.collapsed') !== null,
+        autoAdvance: false
+    },
+    {
+        target: '[data-block-type="if_condition"]',
+        message: 'Drag an "If Condition" block to the workspace',
+        position: 'right',
+        waitForBlock: block => block.type === 'if_condition'
+    },
+    {
+        target: '.connector-parent',
+        message: 'Connect the Function block\'s output to the If block\'s input',
+        position: 'right',
+        waitForConnection: conn => {
+            const fromBlock = blocks.find(b => b.id === conn.fromBlockId);
+            const toBlock = blocks.find(b => b.id === conn.toBlockId);
+            return fromBlock && toBlock && 
+                   fromBlock.type === 'function_definition' && 
+                   toBlock.type === 'if_condition';
+        },
+        highlightConnectors: true
+    },
+    {
+        target: '[data-block-type="if_condition"] input',
+        message: 'Type a condition (e.g. "x > 0")',
+        position: 'bottom',
+        waitForAction: element => {
+            const ifBlock = blocks.find(b => b.type === 'if_condition');
+            return ifBlock && ifBlock.data.condition_text && ifBlock.data.condition_text.length > 0;
+        }
+    },
+    {
+        target: '.category-input-output',
+        message: 'Finally, add some output. Click on "Input/Output"',
+        position: 'right',
+        waitForAction: element => element.querySelector('.category-content.collapsed') !== null,
+        autoAdvance: false
+    },
+    {
+        target: '[data-block-type="log_message"]',
+        message: 'Drag a "Log Message" block to the workspace',
+        position: 'right',
+        waitForBlock: block => block.type === 'log_message'
+    },
+    {
+        target: '.connector-parent',
+        message: 'Connect the If block\'s "True" branch to the Log Message block',
+        position: 'right',
+        waitForConnection: conn => {
+            const fromBlock = blocks.find(b => b.id === conn.fromBlockId);
+            const toBlock = blocks.find(b => b.id === conn.toBlockId);
+            return fromBlock && toBlock && 
+                   fromBlock.type === 'if_condition' && 
+                   toBlock.type === 'log_message';
+        },
+        highlightConnectors: true
+    },
+    {
+        target: '[data-block-type="log_message"] input',
+        message: 'Type a message to log (e.g. "Condition is true!")',
+        position: 'bottom',
+        waitForAction: element => {
+            const logBlock = blocks.find(b => b.type === 'log_message');
+            return logBlock && logBlock.data.message && logBlock.data.message.length > 0;
+        }
+    },
+    {
+        target: '#generate-code-btn',
+        message: 'Great job! Now click "Generate Code" to see your complete JavaScript program.',
+        position: 'left'
+    },
+    {
+        target: '#generated-code',
+        message: 'You\'ve created a class with a method that includes conditional logic! This is the essence of visual programming with ScriptFlow.',
+        position: 'top'
+    }
+];
 
     // Make sure SVG layer covers the entire workspace area initially
     adjustSvgLayerSize();
@@ -362,7 +387,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         connections = [];
         
-        // Reset IDs
+        // Reset IDs - but only when creating a truly new project, not when loading
         nextBlockId = 0;
         nextConnectionId = 0;
         
@@ -375,10 +400,11 @@ document.addEventListener('DOMContentLoaded', () => {
         // Reset history
         undoHistory = [];
         currentStateIndex = -1;
-        saveState();
         
         // Reset generated code area
         generatedCodeArea.textContent = "// Code will appear here";
+        
+        // Don't save state here - let the caller decide when to save
     }
     
     function saveProject() {
@@ -464,11 +490,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     function openProject() {
-        // Check if File System Access API is available
+        // Check if we're in an iframe (modal mode)
+        if (window.parent !== window) {
+            // Send message to parent to handle file opening
+            window.parent.postMessage({
+                action: 'openProject'
+            }, '*');
+            return;
+        }
+        
+        // Standalone mode logic
         if (window.showOpenFilePicker) {
             openWithFilePicker();
         } else {
-            // Fallback to traditional file input
             document.getElementById('file-input').click();
         }
     }
@@ -550,11 +584,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 applyZoomOnly();
             }
             
-            // Set next IDs
+            // Set next IDs to continue from where the saved project left off
             nextBlockId = projectData.nextBlockId || 0;
             nextConnectionId = projectData.nextConnectionId || 0;
             
-            // Create blocks
+            // Create a mapping from old block IDs to new block objects
+            const blockIdMapping = {};
+            
+            // Create blocks and maintain ID mapping
             projectData.blocks.forEach(blockData => {
                 const left = parseFloat(blockData.position.left) || 0;
                 const top = parseFloat(blockData.position.top) || 0;
@@ -563,6 +600,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // Restore block data
                 if (block) {
+                    // Store the mapping from saved ID to new block
+                    blockIdMapping[blockData.id] = block;
+                    
+                    // Restore the saved block data
                     block.data = {...blockData.data};
                     
                     // Update the input fields with the data
@@ -578,21 +619,20 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     });
                     
-                    // Restore connection references
-                    block.connections = JSON.parse(JSON.stringify(blockData.connections));
+                    // Don't restore connection references yet - we'll do this after creating connections
                 }
             });
             
-            // Create connections
+            // Create connections using the ID mapping
             if (projectData.connections && Array.isArray(projectData.connections)) {
                 projectData.connections.forEach(connData => {
-                    const fromBlock = blocks.find(b => b.id === connData.fromBlockId);
-                    const toBlock = blocks.find(b => b.id === connData.toBlockId);
+                    const fromBlock = blockIdMapping[connData.fromBlockId];
+                    const toBlock = blockIdMapping[connData.toBlockId];
                     
                     if (fromBlock && toBlock) {
-                        // Find connector elements - use querySelector to ensure we get the exact element
-                        const fromConnectorSelector = `.connector[data-block-id="${connData.fromBlockId}"][data-connector-type="${connData.fromConnectorType}"][data-connector-name="${connData.fromConnectorName}"]`;
-                        const toConnectorSelector = `.connector[data-block-id="${connData.toBlockId}"][data-connector-type="${connData.toConnectorType}"][data-connector-name="${connData.toConnectorName}"]`;
+                        // Find connector elements using the new block IDs
+                        const fromConnectorSelector = `.connector[data-block-id="${fromBlock.id}"][data-connector-type="${connData.fromConnectorType}"][data-connector-name="${connData.fromConnectorName}"]`;
+                        const toConnectorSelector = `.connector[data-block-id="${toBlock.id}"][data-connector-type="${connData.toConnectorType}"][data-connector-name="${connData.toConnectorName}"]`;
                         
                         const fromConnector = fromBlock.element.querySelector(fromConnectorSelector);
                         const toConnector = toBlock.element.querySelector(toConnectorSelector);
@@ -600,13 +640,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (fromConnector && toConnector) {
                             createConnection(
                                 { 
-                                    blockId: connData.fromBlockId, 
+                                    blockId: fromBlock.id, 
                                     connectorElement: fromConnector, 
                                     connectorType: connData.fromConnectorType, 
                                     connectorName: connData.fromConnectorName 
                                 },
                                 { 
-                                    blockId: connData.toBlockId, 
+                                    blockId: toBlock.id, 
                                     connectorElement: toConnector, 
                                     connectorType: connData.toConnectorType, 
                                     connectorName: connData.toConnectorName 
@@ -614,9 +654,12 @@ document.addEventListener('DOMContentLoaded', () => {
                             );
                         } else {
                             console.warn("Could not find connector elements for connection:", connData);
+                            console.warn("From connector selector:", fromConnectorSelector);
+                            console.warn("To connector selector:", toConnectorSelector);
                         }
                     } else {
                         console.warn("Could not find blocks for connection:", connData);
+                        console.warn("Available block mappings:", Object.keys(blockIdMapping));
                     }
                 });
             }
@@ -906,14 +949,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // Define makeDraggable function before it's used in createBlock
     function makeDraggable(element) {
         element.addEventListener('mousedown', (e) => {
-            // Ignore if clicked on input, connector, delete button, or using Ctrl
+            // Ignore if clicked on input, textarea, select, connector, delete button, or using Ctrl
             if (e.target.tagName === 'INPUT' || 
                 e.target.tagName === 'TEXTAREA' || 
                 e.target.tagName === 'SELECT' ||
                 e.target.classList.contains('connector') || 
                 e.target.classList.contains('delete-block') ||
                 e.ctrlKey) {
-                return;
+                return; // Don't prevent default for these elements
             }
             e.preventDefault();
             
@@ -1608,15 +1651,12 @@ document.addEventListener('DOMContentLoaded', () => {
         blockElement.id = blockId;
         blockElement.className = 'script-block';
         
-        // Position the block in model coordinates (not screen coordinates)
-        // Use Math.round for more precise positioning
+        // Position the block in model coordinates
         blockElement.style.left = `${Math.round(x)}px`;
         blockElement.style.top = `${Math.round(y)}px`;
         
-        
         blockElement.style.backgroundColor = definition.color || '#60a5fa';
         blockElement.style.borderColor = definition.color ? darkenColor(definition.color, 30) : '#4a5568';
-        
 
         // Add delete button (X) in top right
         const deleteBtn = document.createElement('div');
@@ -1658,7 +1698,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         inputField.classList.add('input-checkbox');
                         inputField.addEventListener('change', e => {
                             blockData[inputDef.name] = e.target.checked;
-                            saveState();
                         });
                         break;
                         
@@ -1669,7 +1708,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         inputField.classList.add('input-number');
                         inputField.addEventListener('input', e => {
                             blockData[inputDef.name] = parseFloat(e.target.value) || 0;
-                            saveState();
                         });
                         break;
                         
@@ -1680,31 +1718,29 @@ document.addEventListener('DOMContentLoaded', () => {
                         inputField.classList.add('input-multiline');
                         inputField.addEventListener('input', e => {
                             blockData[inputDef.name] = e.target.value;
-                            saveState();
                         });
                         break;
-                        
+
                     case "select":
                         inputField = document.createElement('select');
                         inputField.classList.add('input-select');
                         
-                        // Add options from the options array
-                        if (inputDef.options && Array.isArray(inputDef.options)) {
+                        // Add options from definition
+                        if (inputDef.options) {
                             inputDef.options.forEach(option => {
                                 const optionEl = document.createElement('option');
-                                optionEl.value = option.value || option;
-                                optionEl.textContent = option.label || option;
+                                optionEl.value = option.value;
+                                optionEl.textContent = option.label;
                                 inputField.appendChild(optionEl);
                             });
                         }
                         
-                        inputField.value = blockData[inputDef.name] || "";
+                        inputField.value = blockData[inputDef.name] || (inputDef.options && inputDef.options[0] ? inputDef.options[0].value : "");
                         inputField.addEventListener('change', e => {
                             blockData[inputDef.name] = e.target.value;
-                            saveState();
                         });
                         break;
-                        
+                            
                     case "string":
                     default:
                         inputField = document.createElement('input');
@@ -1713,7 +1749,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         inputField.classList.add('input-text');
                         inputField.addEventListener('input', e => {
                             blockData[inputDef.name] = e.target.value;
-                            saveState();
                         });
                         break;
                 }
@@ -1738,62 +1773,118 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
         
-        // Add Flow Connectors - Top/Bottom
+        // ENHANCED CONNECTOR SYSTEM - Create connectors dynamically based on definition
+        
+        // Flow Input Connectors (Top)
         if (definition.hasFlowIn !== false) {
             const childConnector = createConnectorElement(blockId, 'flowIn', 'child', 'connector-child');
             blockElement.appendChild(childConnector);
         }
         
+        // Flow Output Connectors (Bottom)
         if (definition.hasFlowOut) {
             const parentConnector = createConnectorElement(blockId, 'flowOut', 'parent', 'connector-parent');
             blockElement.appendChild(parentConnector);
         }
         
-        if (definition.hasBranchFlowOut) { // For 'if' true branch
+        // Branch Flow Outputs (Multiple if needed)
+        if (definition.hasBranchFlowOut) {
             const branchConnector = createConnectorElement(blockId, 'flowOut', 'branch', 'connector-parent');
             branchConnector.style.bottom = '-8px';
             branchConnector.style.left = '75%';
             blockElement.appendChild(branchConnector);
         }
 
-        // Data Input connectors (Left side) - Positioned down the left side
+        if (definition.hasElseBranchFlowOut) {
+            const elseBranchConnector = createConnectorElement(blockId, 'flowOut', 'elseBranch', 'connector-parent connector-else-branch');
+            elseBranchConnector.style.bottom = '-8px';
+            elseBranchConnector.style.left = '25%';
+            elseBranchConnector.querySelector('.connector-text').textContent = 'Else';
+            blockElement.appendChild(elseBranchConnector);
+        }
+
+        // ENHANCED: Custom Flow Outputs from definition
+        if (definition.flowOutputs) {
+            definition.flowOutputs.forEach((flowOutput, index) => {
+                const flowConnector = createConnectorElement(blockId, 'flowOut', flowOutput.name, 'connector-parent');
+                flowConnector.style.bottom = '-8px';
+                
+                // Position multiple flow outputs
+                const totalOutputs = 1 + (definition.hasBranchFlowOut ? 1 : 0) + (definition.hasElseBranchFlowOut ? 1 : 0) + definition.flowOutputs.length;
+                const position = (100 / (totalOutputs + 1)) * (index + 2); // Start after main output
+                flowConnector.style.left = `${position}%`;
+                
+                // Set custom label if provided
+                if (flowOutput.label) {
+                    flowConnector.querySelector('.connector-text').textContent = flowOutput.label;
+                }
+                
+                blockElement.appendChild(flowConnector);
+            });
+        }
+
+        // ENHANCED: Data Input connectors with flexible positioning
         if (definition.dataInputs) {
-            const blockHeight = 40 + (definition.inputs?.length || 0) * 30; // Estimate height based on inputs
-            const inputCount = definition.dataInputs.length;
-            const spacing = blockHeight / (inputCount + 1);
-            
             definition.dataInputs.forEach((dataInputDef, index) => {
                 const inputConnector = createConnectorElement(blockId, 'dataInput', dataInputDef.name, 'connector-input');
-                // Position down the left side, evenly spaced
+                
+                // Calculate position based on block height and number of inputs
+                const blockEstimatedHeight = 60 + (definition.inputs?.length || 0) * 35;
+                const totalInputs = definition.dataInputs.length;
+                const spacing = Math.max(30, blockEstimatedHeight / (totalInputs + 1));
+                
                 inputConnector.style.top = `${spacing * (index + 1)}px`;
                 inputConnector.style.left = '-8px';
+                
+                // Custom positioning if specified
+                if (dataInputDef.position) {
+                    if (dataInputDef.position.top !== undefined) {
+                        inputConnector.style.top = dataInputDef.position.top;
+                    }
+                    if (dataInputDef.position.left !== undefined) {
+                        inputConnector.style.left = dataInputDef.position.left;
+                    }
+                }
+                
                 blockElement.appendChild(inputConnector);
             });
         }
 
-        // Data Output connectors (Right side) - Positioned down the right side
+        // ENHANCED: Data Output connectors with flexible positioning
         if (definition.dataOutputs) {
-            const blockHeight = 40 + (definition.inputs?.length || 0) * 30; // Estimate height based on inputs
-            const outputCount = definition.dataOutputs.length;
-            const spacing = blockHeight / (outputCount + 1);
-            
             definition.dataOutputs.forEach((dataOutputDef, index) => {
                 const outputConnector = createConnectorElement(blockId, 'dataOutput', dataOutputDef.name, 'connector-output');
-                // Position down the right side, evenly spaced
+                
+                // Calculate position based on block height and number of outputs
+                const blockEstimatedHeight = 60 + (definition.inputs?.length || 0) * 35;
+                const totalOutputs = definition.dataOutputs.length;
+                const spacing = Math.max(30, blockEstimatedHeight / (totalOutputs + 1));
+                
                 outputConnector.style.top = `${spacing * (index + 1)}px`;
                 outputConnector.style.right = '-8px';
+                
+                // Custom positioning if specified
+                if (dataOutputDef.position) {
+                    if (dataOutputDef.position.top !== undefined) {
+                        outputConnector.style.top = dataOutputDef.position.top;
+                    }
+                    if (dataOutputDef.position.right !== undefined) {
+                        outputConnector.style.right = dataOutputDef.position.right;
+                    }
+                }
+                
                 blockElement.appendChild(outputConnector);
             });
         }
 
-        makeDraggable(blockElement); // Now this will work since it's defined above
+        makeDraggable(blockElement);
         workspace.appendChild(blockElement);
         
         // Check if we need to expand the workspace
         ensureWorkspaceSize(x + blockElement.offsetWidth, y + blockElement.offsetHeight);
         
         // Store the input field data and create input listeners
-        const inputFields = blockElement.querySelectorAll('input');
+        const inputFields = blockElement.querySelectorAll('input, textarea, select');
         inputFields.forEach(input => {
             const inputName = input.dataset.inputName;
             if (inputName) {
@@ -1801,13 +1892,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     blockData[inputName] = input.checked;
                     input.addEventListener('change', e => {
                         blockData[inputName] = e.target.checked;
-                        saveState(); // Save state when input changes
                     });
                 } else {
                     blockData[inputName] = input.value;
                     input.addEventListener('input', e => {
                         blockData[inputName] = e.target.value;
-                        saveState(); // Save state when input changes
                     });
                 }
             }
@@ -1819,11 +1908,13 @@ document.addEventListener('DOMContentLoaded', () => {
             element: blockElement, 
             definition, 
             data: blockData,
-            // Initialize connection arrays
+            // Initialize connection arrays with support for multiple custom connectors
             connections: { 
                 flowIn: null, 
                 flowOut: [], 
                 branch: [], 
+                elseBranch: [],
+                customFlowOutputs: {}, // For custom flow outputs
                 dataInputs: {}, 
                 dataOutputs: {} 
             } 
@@ -2366,6 +2457,65 @@ document.addEventListener('DOMContentLoaded', () => {
         return formatted.join('\n');
     }
 
+    function getConnectedValue(block, inputName) {
+        // Check if there's a data input connection for this input
+        const connId = block.connections.dataInputs?.[inputName];
+        if (connId) {
+            const conn = connections.find(c => c.id === connId);
+            if (conn) {
+                const sourceBlockId = conn.fromBlockId;
+                const sourceBlock = blocks.find(b => b.id === sourceBlockId);
+                if (sourceBlock) {
+                    // Handle different source block types
+                    if (sourceBlock.type === "value_definition") {
+                        // Use the getValue method for value blocks
+                        if (sourceBlock.definition.getValue) {
+                            return sourceBlock.definition.getValue(sourceBlock);
+                        } else {
+                            // Fallback to toCode if getValue doesn't exist
+                            return sourceBlock.definition.toCode(sourceBlock);
+                        }
+                    } else if (sourceBlock.type === "variable_get") {
+                        // For variable_get blocks, return the variable name without quotes
+                        return sourceBlock.data.varName || "myVar";
+                    } else if (sourceBlock.type === "boolean_value") {
+                        return sourceBlock.data.value === true ? "true" : "false";
+                    } else if (sourceBlock.type === "math_operation") {
+                        // Get connected values for math operation inputs
+                        const leftValue = getConnectedValue(sourceBlock, "left_value") || sourceBlock.data.left || "0";
+                        const rightValue = getConnectedValue(sourceBlock, "right_value") || sourceBlock.data.right || "0";
+                        const operation = sourceBlock.data.operation || "+";
+                        return `(${leftValue} ${operation} ${rightValue})`;
+                    } else if (sourceBlock.type === "comparison") {
+                        // Get connected values for comparison inputs
+                        const leftValue = getConnectedValue(sourceBlock, "left_value") || sourceBlock.data.left || "0";
+                        const rightValue = getConnectedValue(sourceBlock, "right_value") || sourceBlock.data.right || "0";
+                        const operator = sourceBlock.data.operator || "==";
+                        return `(${leftValue} ${operator} ${rightValue})`;
+                    } else if (sourceBlock.type === "object_property") {
+                        const objectName = sourceBlock.data.objectName || "obj";
+                        const propertyName = sourceBlock.data.propertyName || "prop";
+                        return `${objectName}.${propertyName}`;
+                    } else if (sourceBlock.type === "string_operation") {
+                        const string = sourceBlock.data.string || '""';
+                        const operation = sourceBlock.data.operation || "toUpperCase";
+                        const param1 = sourceBlock.data.param1 || "";
+                        const param2 = sourceBlock.data.param2 || "";
+                        
+                        if (operation === "substring" && param1) {
+                            return param2 ? `${string}.${operation}(${param1}, ${param2})` : `${string}.${operation}(${param1})`;
+                        } else {
+                            return `${string}.${operation}()`;
+                        }
+                    } else if (sourceBlock.data && sourceBlock.data.value !== undefined) {
+                        return sourceBlock.data.value;
+                    }
+                }
+            }
+        }
+        return null; // No connection found
+    }
+
     function generateCodeForBlock(block, visited = new Set()) {
         if (!block || visited.has(block.id)) return "";
 
@@ -2399,33 +2549,16 @@ document.addEventListener('DOMContentLoaded', () => {
         } 
         // Handle if block specially (it's a partial container)
         else if (block.definition.type === "if_condition") {
-            // Get condition from input or text field
-            const conditionText = block.data.condition_text || "true";
-            let conditionValue = conditionText;
-            
-            // Check for data input connection for condition
-            const condConnId = block.connections.dataInputs?.condition;
-            if (condConnId) {
-                const conn = connections.find(c => c.id === condConnId);
-                if (conn) {
-                    const sourceBlockId = conn.fromBlockId;
-                    const sourceBlock = blocks.find(b => b.id === sourceBlockId);
-                    if (sourceBlock && sourceBlock.data) {
-                        // For boolean_value blocks, use their value
-                        if (sourceBlock.type === "boolean_value") {
-                            conditionValue = sourceBlock.data.value === true ? "true" : "false";
-                        } else {
-                            conditionValue = sourceBlock.data.value || conditionText;
-                        }
-                    }
-                }
+            // Get condition from connected data input first, then fall back to text field
+            let conditionValue = getConnectedValue(block, "condition");
+            if (conditionValue === null) {
+                conditionValue = block.data.condition_text || "true";
             }
             
-            // Start the if statement
-            code += `if (${conditionValue}) {\n`;
+            console.log("If condition value:", conditionValue); // Debug log
             
             // Process the true branch
-            let branchCode = "";
+            let trueCode = "";
             if (Array.isArray(block.connections.branch)) {
                 for (const branchConnId of block.connections.branch) {
                     const conn = connections.find(c => c.id === branchConnId);
@@ -2433,22 +2566,47 @@ document.addEventListener('DOMContentLoaded', () => {
                         const branchBlockId = conn.toBlockId;
                         const branchBlock = blocks.find(b => b.id === branchBlockId);
                         if (branchBlock) {
-                            // Create a new visited set for the branch
+                            // Create a new visited set for the true branch
                             const branchVisited = new Set();
-                            branchCode += generateCodeForBlock(branchBlock, branchVisited);
+                            trueCode += generateCodeForBlock(branchBlock, branchVisited);
                         }
                     }
                 }
             }
             
-            // Add the branch code (indentation is handled by the formatter)
-            if (branchCode) {
-                code += branchCode;
+            // Process the else branch
+            let elseCode = "";
+            if (Array.isArray(block.connections.elseBranch)) {
+                for (const elseBranchConnId of block.connections.elseBranch) {
+                    const conn = connections.find(c => c.id === elseBranchConnId);
+                    if (conn) {
+                        const elseBlockId = conn.toBlockId;
+                        const elseBlock = blocks.find(b => b.id === elseBlockId);
+                        if (elseBlock) {
+                            // Create a new visited set for the else branch
+                            const elseVisited = new Set();
+                            elseCode += generateCodeForBlock(elseBlock, elseVisited);
+                        }
+                    }
+                }
             }
             
-            // Close the if statement
-            code += '}\n';
-        } 
+            // Generate the if statement with the proper condition
+            let code = `if (${conditionValue}) {\n`;
+            if (trueCode) {
+                code += trueCode.split('\n').map(line => line ? `  ${line}` : line).join('\n').trimEnd() + "\n";
+            }
+            code += `}\n`;
+            
+            // Add else block if there's else code
+            if (elseCode) {
+                code += ` else {\n`;
+                code += elseCode.split('\n').map(line => line ? `  ${line}` : line).join('\n').trimEnd() + "\n";
+                code += `}\n`;
+            }
+            
+            return code;
+        }
         else if (block.definition.type === "class_definition") {
             // Initialize code sections
             let constructorCode = "";
@@ -2993,7 +3151,8 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Delete key to remove selected block (if any)
         if ((e.key === 'Delete' || e.key === 'Backspace') && 
-            document.activeElement.tagName !== 'INPUT') {
+            document.activeElement.tagName !== 'INPUT' &&
+            document.activeElement.tagName !== 'TEXTAREA') {
             // Delete code would go here
             e.preventDefault();
         }
@@ -3018,6 +3177,165 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     );
+
+    /// CONSOLE PANEL SETUP
+
+    // Console Panel Implementation
+    function setupConsolePanel() {
+        // Create console panel elements
+        const consolePanel = document.createElement('div');
+        consolePanel.id = 'console-panel';
+        consolePanel.className = 'console-panel collapsed';
+        
+        // Create header with toggle capability
+        const consoleHeader = document.createElement('div');
+        consoleHeader.className = 'console-header';
+        consoleHeader.innerHTML = '<span class="console-title">Console</span><span class="console-toggle">▲</span>';
+        consoleHeader.addEventListener('click', toggleConsolePanel);
+        
+        // Create console output area
+        const consoleOutput = document.createElement('div');
+        consoleOutput.id = 'console-output';
+        consoleOutput.className = 'console-output';
+        
+        // Create console actions
+        const consoleActions = document.createElement('div');
+        consoleActions.className = 'console-actions';
+        
+        const clearBtn = document.createElement('button');
+        clearBtn.textContent = 'Clear';
+        clearBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            clearConsole();
+        });
+        
+        consoleActions.appendChild(clearBtn);
+        consoleHeader.appendChild(consoleActions);
+        
+        // Assemble console panel
+        consolePanel.appendChild(consoleHeader);
+        consolePanel.appendChild(consoleOutput);
+        
+        // Add to DOM - at the bottom of workspace container
+        document.getElementById('workspace-container').appendChild(consolePanel);
+        
+        // Override console methods to capture logs
+        setupConsoleOverrides();
+    }
+
+    function toggleConsolePanel(e) {
+        const panel = document.getElementById('console-panel');
+        panel.classList.toggle('collapsed');
+        
+        const toggle = document.querySelector('.console-toggle');
+        if (panel.classList.contains('collapsed')) {
+            toggle.textContent = '▲';
+        } else {
+            toggle.textContent = '▼';
+        }
+    }
+
+    function clearConsole() {
+        const output = document.getElementById('console-output');
+        if (output) {
+            output.innerHTML = '';
+        }
+    }
+
+    function appendToConsole(message, type = 'log') {
+        const output = document.getElementById('console-output');
+        if (!output) return;
+        
+        const entry = document.createElement('div');
+        entry.className = `console-entry console-${type}`;
+        
+        // Format the message based on its type
+        let formattedMessage = message;
+        if (typeof message === 'object') {
+            try {
+                formattedMessage = JSON.stringify(message, null, 2);
+            } catch (err) {
+                formattedMessage = String(message);
+            }
+        }
+        
+        // Create timestamp
+        const timestamp = new Date().toLocaleTimeString();
+        const timestampEl = document.createElement('span');
+        timestampEl.className = 'console-timestamp';
+        timestampEl.textContent = timestamp;
+        
+        // Create message content
+        const contentEl = document.createElement('span');
+        contentEl.className = 'console-content';
+        contentEl.textContent = formattedMessage;
+        
+        // Add elements to entry
+        entry.appendChild(timestampEl);
+        entry.appendChild(contentEl);
+        
+        // Add to console
+        output.appendChild(entry);
+        
+        // Auto-scroll to bottom
+        output.scrollTop = output.scrollHeight;
+        
+        // Show console on error
+        if (type === 'error' && document.getElementById('console-panel').classList.contains('collapsed')) {
+            toggleConsolePanel();
+        }
+    }
+
+    function setupConsoleOverrides() {
+        // Save original console methods
+        const originalConsole = {
+            log: console.log,
+            warn: console.warn,
+            error: console.error,
+            info: console.info
+        };
+        
+        // Override console.log
+        console.log = function() {
+            // Call original function
+            originalConsole.log.apply(console, arguments);
+            // Add to our console
+            appendToConsole(Array.from(arguments).join(' '), 'log');
+        };
+        
+        // Override console.warn
+        console.warn = function() {
+            originalConsole.warn.apply(console, arguments);
+            appendToConsole(Array.from(arguments).join(' '), 'warn');
+        };
+        
+        // Override console.error
+        console.error = function() {
+            originalConsole.error.apply(console, arguments);
+            appendToConsole(Array.from(arguments).join(' '), 'error');
+        };
+        
+        // Override console.info
+        console.info = function() {
+            originalConsole.info.apply(console, arguments);
+            appendToConsole(Array.from(arguments).join(' '), 'info');
+        };
+        
+        // Catch global errors
+        window.addEventListener('error', function(event) {
+            appendToConsole(`${event.message} at ${event.filename}:${event.lineno}:${event.colno}`, 'error');
+            // Don't prevent default error handling
+            return false;
+        });
+        
+        // Catch unhandled promise rejections
+        window.addEventListener('unhandledrejection', function(event) {
+            appendToConsole(`Unhandled Promise Rejection: ${event.reason}`, 'error');
+        });
+    }
+
+    // Add console panel to DOM when script loads
+    setupConsolePanel();
     
     // Listen for window resize to adjust the SVG layer
     window.addEventListener('resize', adjustSvgLayerSize);
