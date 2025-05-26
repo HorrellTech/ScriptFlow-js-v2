@@ -1198,60 +1198,153 @@ if (typeof window.JAVASCRIPT_BLOCK_DEFINITIONS === 'undefined') {
             }
         },
 
-        "javascript_code_block": {
-            type: "javascript_code_block",
-            label: "JavaScript Code Block",
-            color: "#1e293b", // Dark slate
+        "evaluate_block": {
+            type: "evaluate_block",
+            label: "Evaluate Code",
+            color: "#7c2d12", // Dark brown/orange
             category: "Functions",
             hasFlowIn: true,
             hasFlowOut: false,
             hasNextFlowOut: true,
-            hasBranchFlowOut: true,
+            hasBranchFlowOut: false,
             isContainer: true,
             inputs: [
                 { name: "description", type: "string", label: "Description (optional):" }
             ],
-            dataOutputs: [
-                { name: "code_output", type: "javascript", label: "JavaScript Code" }
+            dataInputs: [
+                { name: "code_input", type: "javascript", label: "Code to Evaluate" }
             ],
-            toCode: function(block, nextBlockCode, branchBlockCode) {
-                // When used in flow context, just execute the branch code
-                if (branchBlockCode) {
-                    return branchBlockCode;
-                }
-                return "";
-            },
-            getValue: function(block, context) {
-                // When used as a data output, return the generated code from child blocks
-                const childBlocks = getChildBlocks(block); // You'll need to implement this function
-                let code = "";
+            dataOutputs: [
+                { name: "result", type: "any", label: "Evaluation Result" }
+            ],
+            toCode: function(block, nextBlockCode, branchBlockCode, context) {
+                let codeToEvaluate = "";
                 
-                if (childBlocks && childBlocks.length > 0) {
-                    code = generateCodeFromBlocks(childBlocks, context); // You'll need to implement this function
+                // First, try to get code from connected input
+                if (typeof getConnectedValue === 'function') {
+                    const connectedCode = getConnectedValue(block, "code_input", context);
+                    if (connectedCode && connectedCode.trim()) {
+                        codeToEvaluate = connectedCode.trim();
+                    }
                 }
+                
+                // If no connected code, try to get code from branch blocks
+                if (!codeToEvaluate && branchBlockCode) {
+                    codeToEvaluate = branchBlockCode.trim();
+                }
+                
+                if (!codeToEvaluate) {
+                    return "// No code to evaluate\n";
+                }
+                
+                // Wrap the code in a try-catch for safety
+                let code = "try {\n";
+                
+                // Add description as comment if provided
+                const description = block.data.description || "";
+                if (description) {
+                    code += `  // ${description}\n`;
+                }
+                
+                // Add the code to evaluate, properly indented
+                const codeLines = codeToEvaluate.split('\n');
+                codeLines.forEach(line => {
+                    if (line.trim()) {
+                        code += `  ${line}\n`;
+                    }
+                });
+                
+                code += "} catch (error) {\n";
+                code += "  console.error('Evaluation error:', error);\n";
+                code += "}\n";
                 
                 return code;
+            },
+            getValue: function(block, context) {
+                // For data output, we return a reference to the evaluation result
+                // This would typically be used in more advanced scenarios
+                return "evaluationResult";
             }
         },
 
-        "raw_javascript": {
-            type: "raw_javascript",
-            label: "Raw JavaScript",
-            color: "#374151", // Gray
+        "code_comment": {
+            type: "code_comment",
+            label: "Code Comment",
+            color: "#64748b", // Slate gray
             category: "Functions",
             hasFlowIn: false,
             hasFlowOut: false,
             inputs: [
-                { name: "code", type: "multiline", label: "JavaScript Code:", rows: 8 }
+                { name: "comment", type: "multiline", label: "Comment:", rows: 4 },
+                { name: "style", type: "select", label: "Comment Style:", 
+                options: [
+                    { value: "single", label: "Single Line (//)" },
+                    { value: "multi", label: "Multi Line (/* */)" },
+                    { value: "jsdoc", label: "JSDoc (/** */)" }
+                ]}
             ],
             dataOutputs: [
                 { name: "code_output", type: "javascript", label: "JavaScript Code" }
             ],
             toCode: function(block) {
-                return ""; // This block doesn't generate code in flow context
+                const comment = block.data.comment || "";
+                const style = block.data.style || "multi";
+                
+                if (!comment.trim()) {
+                    return "";
+                }
+                
+                switch (style) {
+                    case "single":
+                        return comment.split('\n').map(line => `// ${line}`).join('\n') + '\n';
+                    case "jsdoc":
+                        return `/**\n${comment.split('\n').map(line => ` * ${line}`).join('\n')}\n */\n`;
+                    case "multi":
+                    default:
+                        return `/*\n${comment}\n*/\n`;
+                }
             },
             getValue: function(block) {
-                return block.data.code || "";
+                // Same as toCode for data output
+                const comment = block.data.comment || "";
+                const style = block.data.style || "multi";
+                
+                if (!comment.trim()) {
+                    return "";
+                }
+                
+                switch (style) {
+                    case "single":
+                        return comment.split('\n').map(line => `// ${line}`).join('\n');
+                    case "jsdoc":
+                        return `/**\n${comment.split('\n').map(line => ` * ${line}`).join('\n')}\n */`;
+                    case "multi":
+                    default:
+                        return `/*\n${comment}\n*/`;
+                }
+            }
+        },
+
+        "inline_javascript": {
+            type: "inline_javascript",
+            label: "Inline JavaScript",
+            color: "#475569", // Slate
+            category: "Functions",
+            hasFlowIn: false,
+            hasFlowOut: false,
+            inputs: [
+                { name: "expression", type: "string", label: "JavaScript Expression:" }
+            ],
+            dataOutputs: [
+                { name: "code_output", type: "javascript", label: "JavaScript Code" }
+            ],
+            toCode: function(block) {
+                return block.data.expression || "";
+            },
+            getValue: function(block) {
+                const expression = block.data.expression || "";
+                console.log("Inline JavaScript getValue called, returning:", expression);
+                return expression;
             }
         }
     };

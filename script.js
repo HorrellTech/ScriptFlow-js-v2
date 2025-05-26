@@ -949,7 +949,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     function showTutorial() {
         // Reset tutorial state
-        tutorialMode = true;
+        /*tutorialMode = true;
         tutorialStep = 0;
         localStorage.removeItem('tutorialCompleted');
         
@@ -998,7 +998,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     header.click();
                 }
             }
-        }, 200);
+        }, 200);*/
     }
 
     // Helper to ensure palette blocks have the right data attributes
@@ -1621,7 +1621,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function initTutorialMode() {
-        if (!tutorialMode) return;
+        //if (!tutorialMode) return;
+        return; // Disable tutorial mode for now
         
         // Create skip tutorial button
         const skipBtn = document.createElement('button');
@@ -2146,7 +2147,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     
                     // Set initial value
                     blockData[input.name] = input.defaultValue || '#000000';
-                    continue; // Skip the normal input element creation
+                    return; // Skip the normal input element creation
                 } else {
                     inputElement = document.createElement('input');
                     inputElement.type = 'text';
@@ -2804,7 +2805,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Format the generated code for better readability
         try {
-            // Apply simple formatting (you could use a proper code formatter library here)
+            // Apply enhanced formatting
             finalCode = formatCode(finalCode);
         } catch (e) {
             console.error("Error formatting code:", e);
@@ -2813,26 +2814,169 @@ document.addEventListener('DOMContentLoaded', () => {
         generatedCodeArea.textContent = finalCode || "// No executable flow found or an error occurred.";
     }
 
-    // Simple code formatter
+    // Enhanced code formatter with better indentation handling
     function formatCode(code) {
-        // Split by lines
-        const lines = code.split('\n');
+        if (!code || code.trim() === '') return code;
+        
+        // Detect the primary language type
+        const codeType = detectCodeType(code);
+        
+        if (codeType === 'html') {
+            return formatHTML(code);
+        } else if (codeType === 'css') {
+            return formatCSS(code);
+        } else {
+            return formatJavaScript(code);
+        }
+    }
+
+    // Helper function to detect code type
+    function detectCodeType(code) {
+        const trimmed = code.trim();
+        
+        // Check for HTML
+        if (trimmed.includes('<!DOCTYPE') || 
+            trimmed.includes('<html') || 
+            trimmed.match(/<[a-zA-Z][^>]*>/)) {
+            return 'html';
+        }
+        
+        // Check for CSS
+        if (trimmed.includes('{') && trimmed.includes('}') && 
+            (trimmed.includes(':') || trimmed.includes('@media'))) {
+            return 'css';
+        }
+        
+        // Default to JavaScript
+        return 'javascript';
+    }
+
+    // HTML-specific formatter
+    function formatHTML(code) {
+        const lines = code.split('\n').map(line => line.trim()).filter(line => line.length > 0);
         let formatted = [];
         let indentLevel = 0;
+        const indentSize = 2; // Use 2 spaces for HTML
         
-        for (let line of lines) {
-            line = line.trim();
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i];
+            let currentIndent = indentLevel;
             
-            // Decrease indent for closing braces
-            if (line.startsWith('}') || line.startsWith(']') || line.startsWith(')')) {
-                indentLevel = Math.max(0, indentLevel - 1);
+            // Handle closing tags - decrease indent BEFORE adding the line
+            if (line.startsWith('</')) {
+                currentIndent = Math.max(0, indentLevel - 1);
             }
             
             // Apply current indent
-            const indent = '    '.repeat(indentLevel);
+            const indent = ' '.repeat(currentIndent * indentSize);
             formatted.push(indent + line);
             
-            // Increase indent after opening braces if not immediately closed
+            // Update indent level for next line
+            if (line.startsWith('<!DOCTYPE') || line.startsWith('<!--')) {
+                // DOCTYPE and comments don't affect indentation
+            } else if (line.startsWith('</')) {
+                // Closing tag - decrease indent for next line
+                indentLevel = Math.max(0, indentLevel - 1);
+            } else if (line.match(/^<[a-zA-Z][^>]*>/) && !line.match(/^<[^>]*\/>/)) {
+                // Opening tag that's not self-closing
+                const tagName = line.match(/^<([a-zA-Z][a-zA-Z0-9]*)/)?.[1]?.toLowerCase();
+                
+                // Self-closing HTML tags that don't need indentation
+                const selfClosingTags = ['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 
+                                    'link', 'meta', 'param', 'source', 'track', 'wbr'];
+                
+                if (!selfClosingTags.includes(tagName)) {
+                    // Check if this line also contains the closing tag
+                    const closingTagPattern = new RegExp(`</${tagName}>`);
+                    if (!closingTagPattern.test(line)) {
+                        indentLevel++;
+                    }
+                }
+            } else if (line.match(/^<[^>]*\/>$/)) {
+                // Self-closing tag - no indent change
+            }
+            
+            // Ensure we don't go negative
+            indentLevel = Math.max(0, indentLevel);
+        }
+        
+        return formatted.join('\n');
+    }
+
+    // CSS-specific formatter
+    function formatCSS(code) {
+        const lines = code.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+        let formatted = [];
+        let indentLevel = 0;
+        const indentSize = 2; // Use 2 spaces for CSS
+        
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i];
+            let currentIndent = indentLevel;
+            
+            // Handle closing braces
+            if (line.startsWith('}')) {
+                currentIndent = Math.max(0, indentLevel - 1);
+            }
+            
+            // Apply current indent
+            const indent = ' '.repeat(currentIndent * indentSize);
+            formatted.push(indent + line);
+            
+            // Update indent level for next line
+            if (line.endsWith('{')) {
+                indentLevel++;
+            } else if (line.startsWith('}')) {
+                indentLevel = Math.max(0, indentLevel - 1);
+            }
+            
+            // Ensure we don't go negative
+            indentLevel = Math.max(0, indentLevel);
+        }
+        
+        return formatted.join('\n');
+    }
+
+    // JavaScript-specific formatter (your existing logic)
+    function formatJavaScript(code) {
+        const lines = code.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+        let formatted = [];
+        let indentLevel = 0;
+        const indentSize = 4; // Use 4 spaces for JavaScript
+        
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i];
+            let currentIndent = indentLevel;
+            
+            // Handle closing braces/brackets/parens - decrease indent BEFORE adding the line
+            if (line.startsWith('}') || line.startsWith(']') || line.startsWith(')')|| 
+                line.startsWith('</') || line === 'else' || line.startsWith('else if') ||
+                line.startsWith('catch') || line.startsWith('finally')) {
+                currentIndent = Math.max(0, indentLevel - 1);
+                
+                // Special case: if this line also opens a block, don't decrease
+                if (line.includes('{') || line.includes('[') || line.includes('(') ||
+                    line === 'else {' || line.startsWith('else if') && line.includes('{') ||
+                    line.startsWith('catch') && line.includes('{') ||
+                    line.startsWith('finally') && line.includes('{')) {
+                    currentIndent = indentLevel;
+                }
+            }
+            
+            // Handle special cases for switch statements
+            if (line.startsWith('case ') || line.startsWith('default:')) {
+                currentIndent = Math.max(0, indentLevel - 1);
+            } else if (line.startsWith('break;') && i > 0 && 
+                    (lines[i-1].startsWith('case ') || lines[i-1].startsWith('default:'))) {
+                // Keep break at same level as case
+                currentIndent = Math.max(0, indentLevel - 1);
+            }
+            
+            // Apply current indent
+            const indent = ' '.repeat(currentIndent * indentSize);
+            formatted.push(indent + line);
+            
+            // Update indent level for next line based on what this line contains
             const openBraces = (line.match(/{/g) || []).length;
             const closeBraces = (line.match(/}/g) || []).length;
             const openBrackets = (line.match(/\[/g) || []).length;
@@ -2840,52 +2984,202 @@ document.addEventListener('DOMContentLoaded', () => {
             const openParens = (line.match(/\(/g) || []).length;
             const closeParens = (line.match(/\)/g) || []).length;
             
-            // Check for block openers that should increase indent
-            if ((openBraces > closeBraces) || 
-                (openBrackets > closeBrackets && line.endsWith('[')) || 
-                (openParens > closeParens && line.endsWith('('))) {
+            // Check for various block openers
+            const isBlockOpener = 
+                // Basic block openers
+                (openBraces > closeBraces) ||
+                (openBrackets > closeBrackets && (line.endsWith('[') || line.includes('= ['))) ||
+                (openParens > closeParens && line.endsWith('(')) ||
+                // Control structure patterns
+                line.endsWith('{') ||
+                line.match(/^(if|else|for|while|do|switch|try|catch|finally|function|class)\s*.*\{?\s*$/) ||
+                line.match(/.*=>\s*\{?\s*$/) || // Arrow functions
+                line.match(/^case\s+.*:$/) || // Switch cases
+                line === 'default:' ||
+                // Multi-line array/object patterns
+                (line.includes('[') && !line.includes(']') && !line.endsWith(';')) ||
+                (line.includes('(') && !line.includes(')') && !line.endsWith(';'));
+            
+            const isBlockCloser = 
+                (closeBraces > openBraces) ||
+                (closeBrackets > openBrackets) ||
+                (closeParens > openParens) ||
+                line === 'break;' || line === 'continue;';
+            
+            // Special handling for switch statements
+            if (line.startsWith('case ') || line === 'default:') {
                 indentLevel++;
+            } else if (isBlockOpener && !isBlockCloser) {
+                indentLevel++;
+            } else if (isBlockCloser && !isBlockOpener) {
+                indentLevel = Math.max(0, indentLevel - 1);
             }
+            
+            // Ensure we don't go negative
+            indentLevel = Math.max(0, indentLevel);
         }
         
-        return formatted.join('\n');
+        // Post-process to fix common issues for JavaScript
+        const postProcessed = postProcessFormatting(formatted);
+        
+        return postProcessed.join('\n');
     }
 
-    function getConnectedValue(block, inputName, context) {
-        // Check if there's a data input connection for this input
-        const connId = block.connections.dataInputs?.[inputName];
-        if (connId) {
-            const conn = connections.find(c => c.id === connId);
-            if (conn) {
-                const sourceBlockId = conn.fromBlockId;
-                const sourceBlock = blocks.find(b => b.id === sourceBlockId);
-                if (sourceBlock) {
-                    // Handle different source block types
-                    if (sourceBlock.type === "value_definition") {
-                        return sourceBlock.definition.getValue(sourceBlock, context);
-                    } else if (sourceBlock.type === "variable_get") {
-                        return sourceBlock.definition.getValue(sourceBlock, context);
-                    } else if (sourceBlock.type === "comparison") {
-                        return sourceBlock.definition.getValue(sourceBlock, context);
-                    } else if (sourceBlock.type === "math_operation") {
-                        return sourceBlock.definition.getValue(sourceBlock, context);
-                    } else if (sourceBlock.type === "string_operation") {
-                        return sourceBlock.definition.getValue(sourceBlock, context);
-                    } else if (sourceBlock.type === "object_property") {
-                        return sourceBlock.definition.getValue(sourceBlock, context);
-                    } else if (sourceBlock.type === "boolean_value") {
-                        return sourceBlock.definition.getValue(sourceBlock, context);
+    // Post-processing to fix common formatting issues
+    function postProcessFormatting(lines) {
+        const processed = [];
+        
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i];
+            const trimmedLine = line.trim();
+            
+            // Add spacing around operators for better readability
+            if (trimmedLine.includes('=') && !trimmedLine.includes('==') && !trimmedLine.includes('!=') && 
+                !trimmedLine.includes('<=') && !trimmedLine.includes('>=') && !trimmedLine.includes('=>')) {
+                line = line.replace(/([^=!<>])=([^=])/g, '$1 = $2');
+            }
+            
+            // Add spacing around comparison operators
+            line = line.replace(/([^=!<>])([=!<>]=?)([^=])/g, '$1 $2 $3');
+            
+            // Add spacing around arithmetic operators (but not in strings)
+            if (!trimmedLine.includes('"') && !trimmedLine.includes("'")) {
+                line = line.replace(/([^+\-*/])([\+\-\*/])([^+\-*/=])/g, '$1 $2 $3');
+            }
+            
+            // Fix multiple spaces
+            line = line.replace(/  +/g, ' ');
+            
+            // Add blank lines before certain statements for readability
+            if (i > 0 && (
+                trimmedLine.startsWith('function ') ||
+                trimmedLine.startsWith('class ') ||
+                trimmedLine.startsWith('if ') ||
+                trimmedLine.startsWith('for ') ||
+                trimmedLine.startsWith('while ') ||
+                trimmedLine.startsWith('switch ') ||
+                trimmedLine.startsWith('try ') ||
+                (trimmedLine.startsWith('//') && trimmedLine.length > 10) // Long comments
+            )) {
+                const prevLine = lines[i-1].trim();
+                if (prevLine !== '' && !prevLine.startsWith('//') && !prevLine.endsWith('{')) {
+                    processed.push('');
+                }
+            }
+            
+            processed.push(line);
+        }
+        
+        return processed;
+    }
+
+    // Helper function to generate code from a child block and its connected blocks
+    function generateChildBlockCode(block, context) {
+        if (!block || !block.definition) {
+            return "";
+        }
+        
+        let code = "";
+        const visited = new Set();
+        
+        // Generate code for this block and follow the flow
+        let currentBlock = block;
+        
+        while (currentBlock && !visited.has(currentBlock.id)) {
+            visited.add(currentBlock.id);
+            
+            try {
+                // Generate code for current block
+                if (currentBlock.definition.getValue) {
+                    // For data output blocks, use getValue
+                    const value = currentBlock.definition.getValue(currentBlock, context);
+                    if (value && value.trim()) {
+                        code += value.trim() + "\n";
                     }
-                    
-                    // Generic fallback: check if the block has a getValue method
-                    if (sourceBlock.definition && sourceBlock.definition.getValue) {
-                        return sourceBlock.definition.getValue(sourceBlock, context);
+                } else if (currentBlock.definition.toCode) {
+                    // For flow blocks, use toCode
+                    const blockCode = currentBlock.definition.toCode(currentBlock, "", "", context);
+                    if (blockCode && blockCode.trim()) {
+                        code += blockCode.trim() + "\n";
                     }
                 }
+                
+                // Find next block in the flow
+                let nextBlock = null;
+                if (currentBlock.connections && currentBlock.connections.next) {
+                    const nextBlockIds = Array.isArray(currentBlock.connections.next) 
+                        ? currentBlock.connections.next 
+                        : [currentBlock.connections.next];
+                    
+                    if (nextBlockIds.length > 0) {
+                        const nextBlockId = nextBlockIds[0];
+                        nextBlock = context.blocks.find(b => b.id === nextBlockId);
+                    }
+                }
+                
+                currentBlock = nextBlock;
+            } catch (error) {
+                console.error("Error generating code for block:", currentBlock.type, error);
+                code += `<!-- Error: ${error.message} -->\n`;
+                break;
             }
         }
         
-        // If no connection found, return null (caller should handle fallback to input fields)
+        return code.trim();
+    }
+
+    // Make the function globally available
+    window.generateChildBlockCode = generateChildBlockCode;
+
+
+    function getConnectedValue(block, inputName, context) {
+        console.log(`Getting connected value for block ${block.id}, input: ${inputName}`);
+        console.log("Block connections:", block.connections);
+        
+        // Check if there's a data input connection for this input
+        if (block.connections && block.connections.dataInputs && block.connections.dataInputs[inputName]) {
+            const connectionId = block.connections.dataInputs[inputName];
+            console.log(`Found connection ID: ${connectionId}`);
+            
+            // Find the actual connection object
+            const connection = connections.find(conn => conn.id === connectionId);
+            if (!connection) {
+                console.log(`Connection object not found for ID: ${connectionId}`);
+                return null;
+            }
+            
+            console.log(`Found connection:`, connection);
+            
+            // Get the source block (the one providing the value)
+            const sourceBlockId = connection.fromBlockId;
+            const sourceBlock = blocks.find(b => b.id === sourceBlockId);
+            
+            if (!sourceBlock) {
+                console.log(`Source block not found: ${sourceBlockId}`);
+                return null;
+            }
+            
+            console.log(`Found source block:`, sourceBlock);
+            
+            // Get the output connector name that's providing the value
+            const outputConnectorName = connection.fromConnectorName;
+            
+            if (sourceBlock.definition && sourceBlock.definition.getValue) {
+                try {
+                    const value = sourceBlock.definition.getValue(sourceBlock, context);
+                    console.log(`Got value from source block:`, value);
+                    return value;
+                } catch (error) {
+                    console.error("Error getting connected value:", error);
+                    return null;
+                }
+            } else {
+                console.log(`Source block has no getValue function`);
+                return null;
+            }
+        }
+        
+        console.log(`No connection found for input: ${inputName}`);
         return null;
     }
 
@@ -3060,6 +3354,9 @@ document.addEventListener('DOMContentLoaded', () => {
         
         return code;
     }
+
+    // Make generateCodeForBlock globally available for blocks
+    window.generateCodeForBlock = generateCodeForBlock;
 
     // Add helper function to auto-add "this." when needed
     function addThisIfNeeded(variableName, context) {

@@ -24,31 +24,242 @@ window.HTML_BLOCK_DEFINITIONS = {
         dataInputs: [
             { name: "head_content", type: "html", label: "Head Content" }
         ],
-        toCode: function(block, nextBlockCode, branchBlockCode) {
+        toCode: function(block, nextBlockCode, branchBlockCode, context) {
             const title = block.data.title || "My Page";
             const lang = block.data.lang || "en";
             const charset = block.data.charset || "UTF-8";
             
             let code = `<!DOCTYPE html>\n<html lang="${lang}">\n<head>\n`;
-            code += `  <meta charset="${charset}">\n`;
-            code += `  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n`;
-            code += `  <title>${title}</title>\n`;
+            code += `<meta charset="${charset}">\n`;
+            code += `<meta name="viewport" content="width=device-width, initial-scale=1.0">\n`;
+            code += `<title>${title}</title>\n`;
             
-            // Add head content from connected blocks
+            // Get connected head content using the global getConnectedValue function
             if (typeof getConnectedValue === 'function') {
-                const headContent = getConnectedValue(block, "head_content");
-                if (headContent) {
-                    code += headContent.split('\n').map(line => line ? `  ${line}` : line).join('\n').trimEnd() + "\n";
+                const headContent = getConnectedValue(block, "head_content", context);
+                if (headContent && headContent.trim()) {
+                    // Clean and add head content with proper indentation
+                    const headLines = headContent.trim().split('\n');
+                    for (const line of headLines) {
+                        if (line.trim()) {
+                            code += `${line.trim()}\n`;
+                        }
+                    }
+                }
+            }
+            
+            // Also check for direct connections in context (fallback method)
+            if (context && context.connections && context.blocks) {
+                const connectionsToThisBlock = context.connections.filter(conn => 
+                    conn.toBlockId === block.id && 
+                    conn.toConnectorType === 'dataInput' &&
+                    conn.toConnectorName === 'head_content'
+                );
+                
+                for (const connection of connectionsToThisBlock) {
+                    const sourceBlock = context.blocks.find(b => b.id === connection.fromBlockId);
+                    if (sourceBlock && sourceBlock.definition) {
+                        try {
+                            let value = null;
+                            
+                            // Try getValue first (for data output blocks)
+                            if (sourceBlock.definition.getValue) {
+                                value = sourceBlock.definition.getValue(sourceBlock, context);
+                            } 
+                            // Fallback to toCode for flow blocks
+                            else if (sourceBlock.definition.toCode) {
+                                value = sourceBlock.definition.toCode(sourceBlock, "", "", context);
+                            }
+                            
+                            if (value && value.trim()) {
+                                // Clean and add head content
+                                const headLines = value.trim().split('\n');
+                                for (const line of headLines) {
+                                    if (line.trim()) {
+                                        code += `${line.trim()}\n`;
+                                    }
+                                }
+                            }
+                        } catch (error) {
+                            console.error("Error getting head content from connected block:", error);
+                            code += `<!-- Error: Could not process head content from ${sourceBlock.type} -->\n`;
+                        }
+                    }
                 }
             }
             
             code += `</head>\n<body>\n`;
             
-            if (branchBlockCode) {
-                code += branchBlockCode.split('\n').map(line => line ? `  ${line}` : line).join('\n').trimEnd() + "\n";
+            // Add body content from branch blocks
+            if (branchBlockCode && branchBlockCode.trim()) {
+                // Clean and indent body content
+                const bodyLines = branchBlockCode.trim().split('\n');
+                for (const line of bodyLines) {
+                    if (line.trim()) {
+                        code += `  ${line.trim()}\n`;
+                    }
+                }
             }
             
             code += `</body>\n</html>`;
+            return code;
+        }
+    },
+    
+    "html_script_container": {
+        type: "html_script_container",
+        label: "Script Container",
+        color: "#f59e0b", // Amber
+        category: "HTML Head",
+        hasFlowIn: true,
+        hasFlowOut: false,
+        hasNextFlowOut: true,
+        hasBranchFlowOut: true,
+        isContainer: true,
+        inputs: [
+            { name: "type", type: "select", label: "Script Type:", 
+            options: [
+                { value: "text/javascript", label: "JavaScript" },
+                { value: "module", label: "ES6 Module" },
+                { value: "text/json", label: "JSON" }
+            ]},
+            { name: "src", type: "string", label: "External Source (optional):" },
+            { name: "async", type: "boolean", label: "Async:" },
+            { name: "defer", type: "boolean", label: "Defer:" }
+        ],
+        toCode: function(block, nextBlockCode, branchBlockCode) {
+            const type = block.data.type || "text/javascript";
+            const src = block.data.src || "";
+            const async = block.data.async === true;
+            const defer = block.data.defer === true;
+            
+            let attributes = ` type="${type}"`;
+            if (src) attributes += ` src="${src}"`;
+            if (async) attributes += ` async`;
+            if (defer) attributes += ` defer`;
+            
+            let code = `<script${attributes}>\n`;
+            
+            // Add the branch code (JavaScript blocks) inside the script tags
+            if (branchBlockCode && branchBlockCode.trim()) {
+                // Clean and indent the JavaScript content
+                const jsLines = branchBlockCode.trim().split('\n');
+                for (const line of jsLines) {
+                    if (line.trim()) {
+                        code += `  ${line.trim()}\n`;
+                    }
+                }
+            }
+            
+            code += `</script>\n`;
+            return code;
+        }
+    },
+
+    "html_style_container": {
+        type: "html_style_container",
+        label: "Style Container",
+        color: "#3b82f6", // Blue
+        category: "HTML Head",
+        hasFlowIn: true,
+        hasFlowOut: false,
+        hasNextFlowOut: true,
+        hasBranchFlowOut: true,
+        isContainer: true,
+        inputs: [
+            { name: "media", type: "string", label: "Media Query (optional):" }
+        ],
+        toCode: function(block, nextBlockCode, branchBlockCode) {
+            const media = block.data.media || "";
+            
+            let attributes = "";
+            if (media) attributes += ` media="${media}"`;
+            
+            let code = `<style${attributes}>\n`;
+            
+            // Add the branch code (CSS blocks) inside the style tags
+            if (branchBlockCode && branchBlockCode.trim()) {
+                // Clean and indent the CSS content
+                const cssLines = branchBlockCode.trim().split('\n');
+                for (const line of cssLines) {
+                    if (line.trim()) {
+                        code += `  ${line.trim()}\n`;
+                    }
+                }
+            }
+            
+            code += `</style>\n`;
+            return code;
+        }
+    },
+
+    "html_head_container": {
+        type: "html_head_container",
+        label: "Head Container",
+        color: "#6366f1", // Indigo
+        category: "HTML Head",
+        hasFlowIn: false,
+        hasFlowOut: false,
+        hasNextFlowOut: true,
+        hasBranchFlowOut: true,
+        isContainer: true,
+        inputs: [],
+        dataOutputs: [
+            { name: "html_output", type: "html", label: "HTML" }
+        ],
+        toCode: function(block, nextBlockCode, branchBlockCode) {
+            // When used in flow context, just return the branch content
+            let condition = "<!-- Header Data -->";
+                
+            // First try to get from connected data input
+            if (typeof getConnectedValue === 'function') {
+                const connectedCondition = getConnectedValue(block, "condition");
+                if (connectedCondition !== null) {
+                    condition = connectedCondition;
+                } else {
+                    // Fall back to text input
+                    condition = block.data.condition_text || "<!-- Header Data -->";
+                }
+            } else {
+                condition = block.data.condition_text || "<!-- Header Data -->";
+            }
+            return "";
+        },
+        
+        // Helper method for generating branch code
+        generateBranchCode: function(block, context, visited) {
+            if (!block || visited.has(block.id)) return "";
+            
+            visited.add(block.id);
+            let code = "";
+            
+            try {
+                // Generate code for this block
+                if (block.definition && block.definition.getValue) {
+                    code += block.definition.getValue(block, context);
+                } else if (block.definition && block.definition.toCode) {
+                    code += block.definition.toCode(block, "", "", context);
+                }
+                
+                // Find next block in the flow
+                const nextConnections = context.connections.filter(conn => 
+                    conn.fromBlockId === block.id && 
+                    conn.fromConnectorType === 'flowOut' &&
+                    conn.fromConnectorName === 'next'
+                );
+                
+                for (const conn of nextConnections) {
+                    const nextBlock = context.blocks.find(b => b.id === conn.toBlockId);
+                    if (nextBlock) {
+                        code += this.generateBranchCode(nextBlock, context, visited);
+                    }
+                }
+                
+            } catch (error) {
+                console.error("Error generating code for block:", block.type, error);
+                code += `<!-- Error: ${error.message} -->\n`;
+            }
+            
             return code;
         }
     },

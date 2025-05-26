@@ -1,3 +1,9 @@
+/*
+    * Block Loader Module
+    * This module allows dynamic loading of different sets of blocks (JavaScript, HTML, CSS)
+    * and provides a UI for switching between them.
+    * It initializes with a default block set and allows users to switch sets via a dropdown.
+*/
 window.BlockLoader = {
     currentBlockSet: 'javascript', // default
     availableBlockSets: {
