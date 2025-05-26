@@ -1505,6 +1505,8 @@ document.addEventListener('DOMContentLoaded', () => {
             'HTML Media': '#dc2626',     // Red
             'HTML Tables': '#16a34a',    // Green
             'Misc': '#6b7280'          // Gray
+
+            
         };
         
         // Group blocks by category
