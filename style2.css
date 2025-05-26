@@ -272,7 +272,7 @@
 }
 
 .script-block.collapsed {
-    overflow: hidden;
+    overflow: visible; /* CHANGED: Allow connectors to show outside bounds */
     min-width: 100px; /* Only apply smaller width when collapsed */
     max-width: 150px; /* Limit collapsed width */
     width: auto;
@@ -287,16 +287,13 @@
 }
 
 .script-block.collapsed .connector-child {
-    display: block; /* Keep flow input visible */
+    display: flex !important; /* Keep flow input visible */
+    z-index: 15 !important; /* Higher z-index to stay on top */
 }
 
 .script-block.collapsed .connector-parent {
-    display: block; /* Keep main flow output visible */
-}
-
-.script-block.collapsed {
-    min-width: 100px;
-    padding: 8px 12px;
+    display: flex !important; /* Keep main flow output visible */
+    z-index: 15 !important; /* Higher z-index to stay on top */
 }
 
 .script-block.collapsed .script-block-header {
@@ -304,6 +301,59 @@
     padding-bottom: 0;
     border-bottom: none;
     font-size: 0.8rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Ensure connectors always stay visible on collapsed blocks */
+.script-block.collapsed .connector-child,
+.script-block.collapsed .connector-parent {
+    position: absolute !important;
+    z-index: 15 !important;
+    display: flex !important;
+}
+
+/* Ensure input fields don't make blocks too wide */
+.script-block-content input[type="text"],
+.script-block-content input[type="number"],
+.script-block-content textarea,
+.script-block-content select {
+    max-width: 100%;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.script-block-content textarea {
+    resize: vertical; /* Only allow vertical resize */
+    min-height: 60px;
+    max-height: 200px;
+}
+
+/* Mobile adjustments for block width */
+@media (max-width: 768px) {
+    .script-block {
+        min-width: 140px;
+        max-width: 280px;
+    }
+    
+    .script-block.collapsed {
+        min-width: 80px;
+        max-width: 120px;
+        overflow: visible; /* Keep overflow visible on mobile too */
+    }
+}
+
+/* Touch device adjustments */
+@media (hover: none) and (pointer: coarse) {
+    .script-block {
+        min-width: 160px;
+        max-width: 300px;
+    }
+    
+    .script-block.collapsed {
+        overflow: visible; /* Ensure connectors show on touch devices */
+    }
 }
 
 /* Enhanced Block Palette Scrollbars */
