@@ -1,0 +1,429 @@
+/* Custom Scrollbar Styling - Apply to all scrollable elements */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #1a202c;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #4a5568;
+    border-radius: 4px;
+    border: 1px solid #2d3748;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #718096;
+}
+
+::-webkit-scrollbar-corner {
+    background: #1a202c;
+}
+
+/* Firefox scrollbar styling */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #4a5568 #1a202c;
+}
+
+/* Mobile and Responsive Design */
+@media (max-width: 768px) {
+    body {
+        font-size: 14px;
+    }
+    
+    #app-container {
+        flex-direction: column;
+        height: calc(100vh - 51px);
+    }
+    
+    /* Mobile Toolbar */
+    #toolbar {
+        padding: 8px 10px;
+        flex-wrap: wrap;
+        gap: 5px;
+    }
+    
+    .logo {
+        font-size: 1rem;
+    }
+    
+    .toolbar-buttons, .toolbar-right {
+        gap: 5px;
+    }
+    
+    #toolbar button {
+        padding: 4px 8px;
+        font-size: 0.8rem;
+    }
+    
+    /* Mobile Block Palette */
+    #block-palette {
+        width: 100%;
+        height: 200px;
+        padding: 10px;
+        border-right: none;
+        border-bottom: 1px solid #4a5568;
+        overflow-x: auto;
+        overflow-y: hidden;
+        display: flex;
+        flex-direction: row;
+        gap: 10px;
+    }
+    
+    #block-palette h2 {
+        display: none; /* Hide title on mobile */
+    }
+    
+    .block-category {
+        min-width: 180px;
+        flex-shrink: 0;
+        margin-bottom: 0;
+    }
+    
+    .category-content {
+        max-height: 120px;
+        overflow-y: auto;
+    }
+    
+    .palette-block {
+        font-size: 0.8rem;
+        padding: 8px 10px;
+        margin: 4px 2px;
+    }
+    
+    /* Mobile Workspace Container */
+    #workspace-container {
+        flex: 1;
+        position: relative;
+        padding-bottom: 0;
+    }
+    
+    /* Mobile Code Output */
+    #code-output-container {
+        width: 100%;
+        height: 250px;
+        padding: 10px;
+        border-left: none;
+        border-top: 1px solid #4a5568;
+        order: 3;
+    }
+    
+    #code-output-container h2 {
+        font-size: 1.1rem;
+        margin-bottom: 8px;
+    }
+    
+    #generate-code-btn {
+        padding: 8px;
+        font-size: 0.9rem;
+        margin-bottom: 10px;
+    }
+    
+    #generated-code {
+        font-size: 0.8rem;
+        padding: 10px;
+    }
+    
+    /* Mobile Workspace */
+    #workspace {
+        touch-action: pan-x pan-y pinch-zoom;
+        min-width: 100%;
+        min-height: 100%;
+        background-size: 15px 15px;
+    }
+    
+    /* Mobile Script Blocks */
+    .script-block {
+        min-width: 140px;
+        padding: 8px;
+        font-size: 0.8rem;
+    }
+    
+    .script-block-header {
+        font-size: 0.85rem;
+    }
+    
+    .script-block-content input,
+    .script-block-content textarea,
+    .script-block-content select {
+        font-size: 0.8rem;
+        padding: 4px;
+    }
+    
+    /* Mobile Connectors */
+    .connector {
+        width: 24px;
+        height: 24px;
+        touch-action: none;
+    }
+    
+    .connector-text {
+        font-size: 9px;
+    }
+    
+    /* Mobile Workspace Controls */
+    .workspace-controls {
+        bottom: 10px;
+        right: 10px;
+        padding: 6px;
+        gap: 6px;
+        flex-wrap: wrap;
+        max-width: 200px;
+    }
+    
+    .workspace-controls button {
+        width: 35px;
+        height: 35px;
+        font-size: 16px;
+    }
+    
+    /* Mobile Console Panel */
+    .console-panel {
+        left: 0;
+        right: 0;
+        height: 150px;
+    }
+    
+    .console-panel.collapsed {
+        height: 25px;
+    }
+    
+    .console-header {
+        height: 25px;
+        padding: 3px 8px;
+    }
+    
+    .console-title {
+        font-size: 0.9rem;
+    }
+    
+    /* Mobile Modal adjustments */
+    .scriptflow-modal {
+        width: 95% !important;
+        height: 95% !important;
+        margin: 10px;
+    }
+    
+    /* Hide delete buttons on mobile to prevent accidental deletion */
+    .delete-block {
+        display: none;
+    }
+}
+
+/* Tablet adjustments */
+@media (min-width: 769px) and (max-width: 1024px) {
+    #block-palette {
+        width: 200px;
+        padding: 12px;
+    }
+    
+    #code-output-container {
+        width: 300px;
+        padding: 12px;
+    }
+    
+    .script-block {
+        min-width: 150px;
+    }
+    
+    .workspace-controls {
+        bottom: 15px;
+        right: 15px;
+    }
+}
+
+/* Collapsible Block Styles */
+.script-block {
+    position: relative;
+    /* Add these properties to control width properly */
+    width: auto;
+    min-width: 180px; /* Set a reasonable minimum width for normal blocks */
+    max-width: 350px; /* Prevent blocks from becoming too wide */
+    box-sizing: border-box;
+}
+
+.block-collapse-btn {
+    position: absolute;
+    top: 5px;
+    left: 5px;
+    width: 16px;
+    height: 16px;
+    background-color: rgba(74, 85, 104, 0.8);
+    color: #e2e8f0;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
+    z-index: 6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.7;
+    transition: all 0.2s ease;
+}
+
+.block-collapse-btn:hover {
+    opacity: 1;
+    background-color: rgba(74, 85, 104, 1);
+}
+
+.script-block.collapsed {
+    overflow: hidden;
+    min-width: 100px; /* Only apply smaller width when collapsed */
+    max-width: 150px; /* Limit collapsed width */
+    width: auto;
+}
+
+.script-block.collapsed .script-block-content {
+    display: none;
+}
+
+.script-block.collapsed .connector {
+    display: none;
+}
+
+.script-block.collapsed .connector-child {
+    display: block; /* Keep flow input visible */
+}
+
+.script-block.collapsed .connector-parent {
+    display: block; /* Keep main flow output visible */
+}
+
+.script-block.collapsed {
+    min-width: 100px;
+    padding: 8px 12px;
+}
+
+.script-block.collapsed .script-block-header {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+    font-size: 0.8rem;
+}
+
+/* Enhanced Block Palette Scrollbars */
+#block-palette {
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #4a5568 #1a202c;
+}
+
+.category-content {
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #4a5568 #2d3748;
+}
+
+.category-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.category-content::-webkit-scrollbar-track {
+    background: #2d3748;
+    border-radius: 3px;
+}
+
+.category-content::-webkit-scrollbar-thumb {
+    background: #4a5568;
+    border-radius: 3px;
+}
+
+.category-content::-webkit-scrollbar-thumb:hover {
+    background: #718096;
+}
+
+/* Touch-friendly improvements */
+@media (hover: none) and (pointer: coarse) {
+    /* Touch device styles */
+    .palette-block {
+        padding: 12px;
+        margin: 8px 3px;
+    }
+    
+    .connector {
+        width: 28px;
+        height: 28px;
+    }
+    
+    .delete-block,
+    .block-collapse-btn {
+        width: 24px;
+        height: 24px;
+        font-size: 14px;
+    }
+    
+    .workspace-controls button {
+        width: 40px;
+        height: 40px;
+        font-size: 18px;
+    }
+    
+    /* Larger touch targets for inputs */
+    .script-block-content input,
+    .script-block-content textarea,
+    .script-block-content select {
+        min-height: 32px;
+        padding: 6px;
+    }
+}
+
+/* Dark mode scrollbar for code areas */
+#generated-code::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+#generated-code::-webkit-scrollbar-track {
+    background: #2d3748;
+    border-radius: 4px;
+}
+
+#generated-code::-webkit-scrollbar-thumb {
+    background: #4a5568;
+    border-radius: 4px;
+}
+
+#generated-code::-webkit-scrollbar-thumb:hover {
+    background: #718096;
+}
+
+/* Console output scrollbar */
+.console-output::-webkit-scrollbar {
+    width: 6px;
+}
+
+.console-output::-webkit-scrollbar-track {
+    background: #1a1e2c;
+    border-radius: 3px;
+}
+
+.console-output::-webkit-scrollbar-thumb {
+    background: #4a5568;
+    border-radius: 3px;
+}
+
+.console-output::-webkit-scrollbar-thumb:hover {
+    background: #718096;
+}
+
+/* Mobile navigation helper */
+@media (max-width: 768px) {
+    .mobile-nav-helper {
+        position: fixed;
+        top: 60px;
+        left: 10px;
+        background-color: rgba(26, 32, 44, 0.9);
+        color: #e2e8f0;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        z-index: 1000;
+        display: block;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+}

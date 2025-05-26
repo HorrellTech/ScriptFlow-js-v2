@@ -3,6 +3,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const previousLabel = "^";
     const bodyLabel = "{--}"
 
+    // Mobile detection
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    
+    // Touch handling variables
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchStartTime = 0;
+    let lastTouchEnd = 0;
+    let touchDevice = false;
+
     // Make getConnectedValue available globally for blocks.js
     window.getConnectedValue = getConnectedValue;
 
@@ -679,6 +690,165 @@ document.addEventListener('DOMContentLoaded', () => {
             alert("Error loading project file. The file may be corrupted or in an incompatible format.");
         }
     }
+
+    function setupTouchEvents() {
+        let touchStarted = false;
+        let initialDistance = 0;
+        let initialScale = 1;
+        
+        // Touch start
+        workspace.addEventListener('touchstart', (e) => {
+            touchStarted = true;
+            touchStartTime = Date.now();
+            
+            if (e.touches.length === 1) {
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+            } else if (e.touches.length === 2) {
+                // Pinch to zoom setup
+                const touch1 = e.touches[0];
+                const touch2 = e.touches[1];
+                initialDistance = Math.hypot(
+                    touch2.clientX - touch1.clientX,
+                    touch2.clientY - touch1.clientY
+                );
+                initialScale = scale;
+                isPanning = true;
+            }
+        }, { passive: false });
+        
+        // Touch move
+        workspace.addEventListener('touchmove', (e) => {
+            if (!touchStarted) return;
+            
+            if (e.touches.length === 1 && isPanning) {
+                // Single finger pan
+                const deltaX = (e.touches[0].clientX - touchStartX) / scale;
+                const deltaY = (e.touches[0].clientY - touchStartY) / scale;
+                
+                // Move all blocks
+                blocks.forEach(block => {
+                    const left = parseFloat(block.element.style.left) || 0;
+                    const top = parseFloat(block.element.style.top) || 0;
+                    
+                    block.element.style.left = `${left + deltaX}px`;
+                    block.element.style.top = `${top + deltaY}px`;
+                });
+                
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+                updateAllConnectionLines();
+                
+                e.preventDefault();
+            } else if (e.touches.length === 2) {
+                // Pinch to zoom
+                const touch1 = e.touches[0];
+                const touch2 = e.touches[1];
+                const currentDistance = Math.hypot(
+                    touch2.clientX - touch1.clientX,
+                    touch2.clientY - touch1.clientY
+                );
+                
+                const newScale = Math.max(0.2, Math.min(3, initialScale * (currentDistance / initialDistance)));
+                scale = newScale;
+                applyZoomOnly();
+                
+                e.preventDefault();
+            }
+        }, { passive: false });
+        
+        // Touch end
+        workspace.addEventListener('touchend', (e) => {
+            if (touchStarted) {
+                const touchDuration = Date.now() - touchStartTime;
+                
+                if (e.touches.length === 0) {
+                    isPanning = false;
+                    touchStarted = false;
+                    
+                    // Save state after touch interaction
+                    if (touchDuration > 100) {
+                        saveState();
+                    }
+                }
+                
+                // Prevent double-tap zoom
+                const now = Date.now();
+                if (now - lastTouchEnd <= 300) {
+                    e.preventDefault();
+                }
+                lastTouchEnd = now;
+            }
+        });
+        
+        // Prevent context menu on long press
+        workspace.addEventListener('contextmenu', (e) => {
+            if (touchDevice) {
+                e.preventDefault();
+            }
+        });
+    }
+
+    function makeBlockCollapsible(blockElement, blockObject) {
+        // Create collapse button
+        const collapseBtn = document.createElement('button');
+        collapseBtn.className = 'block-collapse-btn';
+        collapseBtn.innerHTML = '−';
+        collapseBtn.title = 'Collapse/Expand Block';
+        
+        // Add collapse functionality
+        collapseBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleBlockCollapse(blockElement, blockObject, collapseBtn);
+        });
+        
+        blockElement.appendChild(collapseBtn);
+        
+        // Store original height for animation
+        blockObject.originalHeight = blockElement.offsetHeight;
+    }
+    
+    function toggleBlockCollapse(blockElement, blockObject, collapseBtn) {
+        const isCollapsed = blockElement.classList.contains('collapsed');
+        
+        if (isCollapsed) {
+            // Expand block
+            blockElement.classList.remove('collapsed');
+            collapseBtn.innerHTML = '−';
+            collapseBtn.title = 'Collapse Block';
+            
+            // Show connectors with animation
+            setTimeout(() => {
+                const connectors = blockElement.querySelectorAll('.connector');
+                connectors.forEach(connector => {
+                    if (!connector.classList.contains('connector-child') && 
+                        !connector.classList.contains('connector-parent')) {
+                        connector.style.display = 'flex';
+                    }
+                });
+                updateAllConnectionLines();
+            }, 150);
+        } else {
+            // Collapse block
+            blockElement.classList.add('collapsed');
+            collapseBtn.innerHTML = '+';
+            collapseBtn.title = 'Expand Block';
+            
+            // Hide non-essential connectors
+            const connectors = blockElement.querySelectorAll('.connector');
+            connectors.forEach(connector => {
+                if (!connector.classList.contains('connector-child') && 
+                    !connector.classList.contains('connector-parent')) {
+                    connector.style.display = 'none';
+                }
+            });
+            
+            updateAllConnectionLines();
+        }
+        
+        // Save state after collapsing/expanding
+        saveState();
+    }
     
     function showTutorial() {
         // Reset tutorial state
@@ -948,6 +1118,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 attributeFilter: ['style', 'transform'] 
             });
         });
+    }
+
+    // Enhanced mobile support functions
+    function setupMobileSupport() {
+        if (isMobile || isTouchDevice) {
+            touchDevice = true;
+            
+            // Add mobile navigation helper
+            const mobileHelper = document.createElement('div');
+            mobileHelper.className = 'mobile-nav-helper';
+            mobileHelper.innerHTML = 'Pinch to zoom • Two-finger pan • Tap to select';
+            document.body.appendChild(mobileHelper);
+            
+            // Hide helper after 5 seconds
+            setTimeout(() => {
+                mobileHelper.style.opacity = '0';
+                setTimeout(() => mobileHelper.remove(), 500);
+            }, 5000);
+            
+            // Setup touch event handlers
+            setupTouchEvents();
+            
+            // Modify workspace for mobile
+            workspace.style.touchAction = 'manipulation';
+            
+            // Add mobile-specific CSS class
+            document.body.classList.add('mobile-device');
+        }
     }
 
     // Define makeDraggable function before it's used in createBlock
@@ -1349,7 +1547,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const header = categoryContainer.querySelector('.category-header');
                     if (header) {
                         console.log(`Automatically expanding category for tutorial step`);
-                        header.click();
+                        //header.click();
                     }
                 }
             }
@@ -1668,7 +1866,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Add delete button (X) in top right
         const deleteBtn = document.createElement('div');
         deleteBtn.className = 'delete-block';
-        deleteBtn.innerHTML = '&times;'; // × symbol
+        deleteBtn.innerHTML = '&times;';
         deleteBtn.title = 'Delete block';
         deleteBtn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -1808,11 +2006,31 @@ document.addEventListener('DOMContentLoaded', () => {
         makeDraggable(blockElement);
         workspace.appendChild(blockElement);
         
-        // NOW calculate the actual block dimensions after it's been rendered
+        // Create the block object
+        const blockObject = { 
+            id: blockId, 
+            type: type, 
+            element: blockElement, 
+            definition, 
+            data: blockData,
+            connections: { 
+                flowIn: null, 
+                flowOut: [], 
+                branch: [], 
+                elseBranch: [],
+                next: [],
+                customFlowOutputs: {},
+                dataInputs: {}, 
+                dataOutputs: {} 
+            }
+        };
+        
+        // Make block collapsible
+        makeBlockCollapsible(blockElement, blockObject);
+        
+        // Add connectors (existing code)
         const actualBlockHeight = blockElement.offsetHeight;
         const actualBlockWidth = blockElement.offsetWidth;
-        
-        // ENHANCED CONNECTOR SYSTEM - Create connectors dynamically based on definition
         
         // Flow Input Connectors (Top)
         if (definition.hasFlowIn !== false) {
@@ -1851,35 +2069,10 @@ document.addEventListener('DOMContentLoaded', () => {
             blockElement.appendChild(elseBranchConnector);
         }
 
-        // ENHANCED: Custom Flow Outputs from definition
-        if (definition.flowOutputs) {
-            definition.flowOutputs.forEach((flowOutput, index) => {
-                const flowConnector = createConnectorElement(blockId, 'flowOut', flowOutput.name, 'connector-parent');
-                flowConnector.style.bottom = '-8px';
-                
-                // Position multiple flow outputs
-                const totalOutputs = 1 + (definition.hasBranchFlowOut ? 1 : 0) + (definition.hasElseBranchFlowOut ? 1 : 0) + definition.flowOutputs.length;
-                const position = (100 / (totalOutputs + 1)) * (index + 2); // Start after main output
-                flowConnector.style.left = `${position}%`;
-                
-                // Set custom label if provided
-                if (flowOutput.label) {
-                    flowConnector.querySelector('.connector-text').textContent = flowOutput.label;
-                }
-                
-                blockElement.appendChild(flowConnector);
-            });
-        }
-
-        // ENHANCED: Data Input connectors with flexible positioning
+        // Data Input connectors
         if (definition.dataInputs) {
-            // Calculate minimum height needed for all data inputs
-            const minHeightForInputs = Math.max(
-                actualBlockHeight, 
-                40 + (definition.dataInputs.length * 35) // Header + spacing per input
-            );
+            const minHeightForInputs = Math.max(actualBlockHeight, 40 + (definition.dataInputs.length * 35));
             
-            // Set minimum height if needed
             if (minHeightForInputs > actualBlockHeight) {
                 blockElement.style.minHeight = `${minHeightForInputs}px`;
             }
@@ -1887,16 +2080,14 @@ document.addEventListener('DOMContentLoaded', () => {
             definition.dataInputs.forEach((dataInputDef, index) => {
                 const inputConnector = createConnectorElement(blockId, 'dataInput', dataInputDef.name, 'connector-input');
                 
-                // Calculate position based on block height and number of inputs
                 const blockHeight = Math.max(actualBlockHeight, minHeightForInputs);
                 const totalInputs = definition.dataInputs.length;
-                const usableHeight = blockHeight - 40; // Subtract header height
+                const usableHeight = blockHeight - 40;
                 const spacing = usableHeight / (totalInputs + 1);
                 
-                inputConnector.style.top = `${40 + spacing * (index + 1)}px`; // Start after header
+                inputConnector.style.top = `${40 + spacing * (index + 1)}px`;
                 inputConnector.style.left = '-8px';
                 
-                // Custom positioning if specified (overrides calculated position)
                 if (dataInputDef.position) {
                     if (dataInputDef.position.top !== undefined) {
                         inputConnector.style.top = dataInputDef.position.top;
@@ -1910,15 +2101,10 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        // ENHANCED: Data Output connectors with flexible positioning
+        // Data Output connectors
         if (definition.dataOutputs) {
-            // Calculate minimum height needed for all data outputs
-            const minHeightForOutputs = Math.max(
-                actualBlockHeight, 
-                40 + (definition.dataOutputs.length * 35) // Header + spacing per output
-            );
+            const minHeightForOutputs = Math.max(actualBlockHeight, 40 + (definition.dataOutputs.length * 35));
             
-            // Set minimum height if needed
             if (minHeightForOutputs > actualBlockHeight) {
                 blockElement.style.minHeight = `${minHeightForOutputs}px`;
             }
@@ -1926,16 +2112,14 @@ document.addEventListener('DOMContentLoaded', () => {
             definition.dataOutputs.forEach((dataOutputDef, index) => {
                 const outputConnector = createConnectorElement(blockId, 'dataOutput', dataOutputDef.name, 'connector-output');
                 
-                // Calculate position based on block height and number of outputs
                 const blockHeight = Math.max(actualBlockHeight, minHeightForOutputs);
                 const totalOutputs = definition.dataOutputs.length;
-                const usableHeight = blockHeight - 40; // Subtract header height
+                const usableHeight = blockHeight - 40;
                 const spacing = usableHeight / (totalOutputs + 1);
                 
-                outputConnector.style.top = `${40 + spacing * (index + 1)}px`; // Start after header
+                outputConnector.style.top = `${40 + spacing * (index + 1)}px`;
                 outputConnector.style.right = '-8px';
                 
-                // Custom positioning if specified (overrides calculated position)
                 if (dataOutputDef.position) {
                     if (dataOutputDef.position.top !== undefined) {
                         outputConnector.style.top = dataOutputDef.position.top;
@@ -1952,29 +2136,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // Check if we need to expand the workspace
         ensureWorkspaceSize(x + blockElement.offsetWidth, y + blockElement.offsetHeight);
         
-        // Create the block object and add it to the blocks array
-        const blockObject = { 
-            id: blockId, 
-            type: type, 
-            element: blockElement, 
-            definition, 
-            data: blockData,  // Use the properly initialized blockData
-            // Initialize connection arrays with support for multiple custom connectors
-            connections: { 
-            flowIn: null, 
-            flowOut: [], 
-            branch: [], 
-            elseBranch: [],
-            next: [], // Add this for sequential "next" blocks
-            customFlowOutputs: {}, // For custom flow outputs
-            dataInputs: {}, 
-            dataOutputs: {} 
-        }
-        };
-        
         blocks.push(blockObject);
         
-        return blockObject; // Return the created block object
+        return blockObject;
     }
 
     function handleConnectorMouseDown(e) {
@@ -2753,7 +2917,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Undo System Functions
     function saveState() {
-        // Create a serializable state
         const state = {
             blocks: blocks.map(block => ({
                 id: block.id,
@@ -2763,7 +2926,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     left: block.element.style.left,
                     top: block.element.style.top
                 },
-                connections: JSON.parse(JSON.stringify(block.connections)) // Deep copy
+                connections: JSON.parse(JSON.stringify(block.connections)),
+                collapsed: block.element.classList.contains('collapsed') // Save collapsed state
             })),
             connections: connections.map(conn => ({
                 id: conn.id,
@@ -2781,25 +2945,20 @@ document.addEventListener('DOMContentLoaded', () => {
             scale: scale
         };
 
-        // If we're at the end of history, add this state
-        // Otherwise, truncate the history
         if (currentStateIndex === undoHistory.length - 1) {
             undoHistory.push(state);
             currentStateIndex = undoHistory.length - 1;
             
-            // Limit history size
             if (undoHistory.length > MAX_UNDO_HISTORY) {
-                undoHistory.shift(); // Remove oldest state
+                undoHistory.shift();
                 currentStateIndex--;
             }
         } else {
-            // Delete anything after current index
             undoHistory = undoHistory.slice(0, currentStateIndex + 1);
             undoHistory.push(state);
             currentStateIndex = undoHistory.length - 1;
         }
         
-        // Update UI
         updateUndoButtons();
     }
 
@@ -2861,7 +3020,7 @@ document.addEventListener('DOMContentLoaded', () => {
             block.data = {...blockData.data};
             
             // Update the input fields with the data
-            const inputFields = block.element.querySelectorAll('input');
+            const inputFields = block.element.querySelectorAll('input, textarea, select');
             inputFields.forEach(input => {
                 const inputName = input.dataset.inputName;
                 if (inputName && blockData.data[inputName] !== undefined) {
@@ -2873,7 +3032,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
             
-            // Restore connection references (actual connections will be recreated later)
+            // Restore collapsed state if it exists
+            if (blockData.collapsed) {
+                const collapseBtn = block.element.querySelector('.block-collapse-btn');
+                if (collapseBtn) {
+                    toggleBlockCollapse(block.element, block, collapseBtn);
+                }
+            }
+            
+            // Restore connection references
             block.connections = JSON.parse(JSON.stringify(blockData.connections));
         });
         
@@ -2883,7 +3050,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const toBlock = blocks.find(b => b.id === connData.toBlockId);
             
             if (fromBlock && toBlock) {
-                // Find connector elements
                 const fromConnector = [...fromBlock.element.querySelectorAll('.connector')].find(c => 
                     c.dataset.blockId === connData.fromBlockId &&
                     c.dataset.connectorType === connData.fromConnectorType &&
@@ -3419,6 +3585,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Add console panel to DOM when script loads
     setupConsolePanel();
+
+    // Initialize mobile support
+    setupMobileSupport();
     
     // Listen for window resize to adjust the SVG layer
     window.addEventListener('resize', adjustSvgLayerSize);

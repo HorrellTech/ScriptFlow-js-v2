@@ -410,7 +410,7 @@ if (typeof BLOCK_DEFINITIONS === 'undefined') {
                 { name: "increment", type: "string", label: "Increment:" }
             ],
             toCode: function(block, nextBlockCode, branchBlockCode) {
-                const init = block.data.init || "let i = 0";
+                const init = block.data.init || "i";
                 const condition = block.data.condition || "i < 10";
                 const increment = block.data.increment || "i++";
                 
