@@ -238,11 +238,10 @@
 
 /* Collapsible Block Styles */
 .script-block {
-    position: relative;
-    /* Add these properties to control width properly */
+    position: absolute;
     width: auto;
-    min-width: 180px; /* Set a reasonable minimum width for normal blocks */
-    max-width: 350px; /* Prevent blocks from becoming too wide */
+    min-width: 100px; /* Set a reasonable minimum width for normal blocks */
+    max-width: 150px; /* Prevent blocks from becoming too wide */
     box-sizing: border-box;
 }
 
@@ -272,9 +271,9 @@
 }
 
 .script-block.collapsed {
-    overflow: visible; /* CHANGED: Allow connectors to show outside bounds */
-    min-width: 100px; /* Only apply smaller width when collapsed */
-    max-width: 150px; /* Limit collapsed width */
+    overflow: visible !important; /* Force visible overflow */
+    min-width: 100px;
+    max-width: 150px;
     width: auto;
 }
 
@@ -286,14 +285,46 @@
     display: none;
 }
 
+/* FIXED: Ensure essential connectors stay visible and positioned correctly */
 .script-block.collapsed .connector-child {
-    display: flex !important; /* Keep flow input visible */
-    z-index: 15 !important; /* Higher z-index to stay on top */
+    display: flex !important;
+    position: absolute; /* Remove !important */
+    z-index: 20 !important;
+    /* Center on top edge */
+    top: -8px !important;
+    left: 50% !important;
+    transform: translateX(-50%); /* Remove !important */
 }
 
 .script-block.collapsed .connector-parent {
-    display: flex !important; /* Keep main flow output visible */
-    z-index: 15 !important; /* Higher z-index to stay on top */
+    display: flex !important;
+    position: absolute; /* Remove !important */
+    z-index: 20 !important;
+    /* Center on bottom edge */
+    bottom: -8px !important;
+    left: 50% !important;
+    transform: translateX(-50%); /* Remove !important */
+}
+
+/* For data connectors on collapsed blocks - center them on their respective sides */
+.script-block.collapsed .connector-input {
+    display: flex !important;
+    position: absolute; /* Remove !important */
+    z-index: 20 !important;
+    /* Center on left edge */
+    left: -8px !important;
+    top: 150% !important;
+    transform: translateY(-150%); /* Remove !important */
+}
+
+.script-block.collapsed .connector-output {
+    display: flex !important;
+    position: absolute; /* Remove !important */
+    z-index: 20 !important;
+    /* Center on right edge */
+    right: -8px !important;
+    top: 150% !important;
+    transform: translateY(-150%); /* Remove !important */
 }
 
 .script-block.collapsed .script-block-header {
@@ -477,3 +508,4 @@
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     }
 }
+

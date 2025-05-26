@@ -217,161 +217,195 @@ document.addEventListener('DOMContentLoaded', () => {
     let tutorialStep = 0;
     let tutorialTooltip = null;
     const tutorialSteps = [
-    {
-        target: '.category-flow-control',
-        message: 'Welcome to ScriptFlow! Let\'s start by clicking on "Flow Control" to expand blocks',
-        position: 'right'
-    },
-    {
-        target: '[data-block-type="start"]',
-        message: 'Drag a "Start" block to the workspace - this is the entry point of your program',
-        position: 'right'
-    },
-    {
-        target: '.category-objects',
-        message: 'Now click on "Objects" to see object-oriented programming blocks',
-        position: 'right',
-        waitForAction: element => element.querySelector('.category-content.collapsed') !== null,
-        autoAdvance: false
-    },
-    {
-        target: '[data-block-type="class_definition"]',
-        message: 'Drag a "Class Definition" block to the workspace - we\'ll build a simple class',
-        position: 'right',
-        waitForBlock: block => block.type === 'class_definition'
-    },
-    {
-        target: '.connector-parent',
-        message: 'Connect the Start block to the Class block by dragging from the Start block\'s output connector to the Class block\'s input connector',
-        position: 'right',
-        waitForConnection: true,
-        highlightConnectors: true
-    },
-    {
-        target: '[data-block-type="class_definition"] input',
-        message: 'Type a name for your class (e.g. "Calculator")',
-        position: 'bottom',
-        waitForAction: element => {
-            const classBlock = blocks.find(b => b.type === 'class_definition');
-            return classBlock && classBlock.data.className && classBlock.data.className.length > 0;
-        }
-    },
-    {
-        target: '.category-functions',
-        message: 'Click on "Functions" to see function-related blocks',
-        position: 'right',
-        waitForAction: element => element.querySelector('.category-content.collapsed') !== null,
-        autoAdvance: false
-    },
-    {
-        target: '[data-block-type="function_definition"]',
-        message: 'Drag a "Function Definition" block to the workspace - this will be a method in our class',
-        position: 'right',
-        waitForBlock: block => block.type === 'function_definition'
-    },
-    {
-        target: '.connector-parent',
-        message: 'Connect the Class block\'s output connector to the Function block\'s input connector',
-        position: 'right',
-        waitForConnection: conn => {
-            const fromBlock = blocks.find(b => b.id === conn.fromBlockId);
-            const toBlock = blocks.find(b => b.id === conn.toBlockId);
-            return fromBlock && toBlock && 
-                   fromBlock.type === 'class_definition' && 
-                   toBlock.type === 'function_definition';
+        {
+            target: '.category-flow-control',
+            message: 'Welcome to ScriptFlow! Let\'s start by clicking on "Flow Control" to expand blocks',
+            position: 'right',
+            autoAdvance: false
         },
-        highlightConnectors: true
-    },
-    {
-        target: '[data-block-type="function_definition"] input',
-        message: 'Name your function (e.g. "calculate")',
-        position: 'bottom',
-        waitForAction: element => {
-            const functionBlock = blocks.find(b => b.type === 'function_definition');
-            return functionBlock && functionBlock.data.funcName && functionBlock.data.funcName.length > 0;
-        }
-    },
-    {
-        target: '.category-logic',
-        message: 'Let\'s add some logic. Click on "Logic" to see logic blocks',
-        position: 'right',
-        waitForAction: element => element.querySelector('.category-content.collapsed') !== null,
-        autoAdvance: false
-    },
-    {
-        target: '[data-block-type="if_condition"]',
-        message: 'Drag an "If Condition" block to the workspace',
-        position: 'right',
-        waitForBlock: block => block.type === 'if_condition'
-    },
-    {
-        target: '.connector-parent',
-        message: 'Connect the Function block\'s output to the If block\'s input',
-        position: 'right',
-        waitForConnection: conn => {
-            const fromBlock = blocks.find(b => b.id === conn.fromBlockId);
-            const toBlock = blocks.find(b => b.id === conn.toBlockId);
-            return fromBlock && toBlock && 
-                   fromBlock.type === 'function_definition' && 
-                   toBlock.type === 'if_condition';
+        {
+            target: '[data-block-type="start"]',
+            message: 'Drag a "Start" block to the workspace - this is the entry point of your program',
+            position: 'right'
         },
-        highlightConnectors: true
-    },
-    {
-        target: '[data-block-type="if_condition"] input',
-        message: 'Type a condition (e.g. "x > 0")',
-        position: 'bottom',
-        waitForAction: element => {
-            const ifBlock = blocks.find(b => b.type === 'if_condition');
-            return ifBlock && ifBlock.data.condition_text && ifBlock.data.condition_text.length > 0;
-        }
-    },
-    {
-        target: '.category-input-output',
-        message: 'Finally, add some output. Click on "Input/Output"',
-        position: 'right',
-        waitForAction: element => element.querySelector('.category-content.collapsed') !== null,
-        autoAdvance: false
-    },
-    {
-        target: '[data-block-type="log_message"]',
-        message: 'Drag a "Log Message" block to the workspace',
-        position: 'right',
-        waitForBlock: block => block.type === 'log_message'
-    },
-    {
-        target: '.connector-parent',
-        message: 'Connect the If block\'s "True" branch to the Log Message block',
-        position: 'right',
-        waitForConnection: conn => {
-            const fromBlock = blocks.find(b => b.id === conn.fromBlockId);
-            const toBlock = blocks.find(b => b.id === conn.toBlockId);
-            return fromBlock && toBlock && 
-                   fromBlock.type === 'if_condition' && 
-                   toBlock.type === 'log_message';
+        {
+            target: '.category-objects',
+            message: 'Now click on "Objects" to see object-oriented programming blocks',
+            position: 'right',
+            autoAdvance: false
         },
-        highlightConnectors: true
-    },
-    {
-        target: '[data-block-type="log_message"] input',
-        message: 'Type a message to log (e.g. "Condition is true!")',
-        position: 'bottom',
-        waitForAction: element => {
-            const logBlock = blocks.find(b => b.type === 'log_message');
-            return logBlock && logBlock.data.message && logBlock.data.message.length > 0;
+        {
+            target: '[data-block-type="class_definition"]',
+            message: 'Drag a "Class Definition" block to the workspace - we\'ll build a simple class',
+            position: 'right',
+            waitForBlock: block => block.type === 'class_definition'
+        },
+        {
+            target: '.connector-parent',
+            message: 'Connect the Start block to the Class block by dragging from the Start block\'s output connector to the Class block\'s input connector',
+            position: 'right',
+            waitForConnection: true,
+            highlightConnectors: true
+        },
+        {
+            target: '[data-block-type="class_definition"] input',
+            message: 'Type a name for your class (e.g. "Calculator")',
+            position: 'bottom',
+            waitForAction: element => {
+                const classBlock = blocks.find(b => b.type === 'class_definition');
+                return classBlock && classBlock.data.className && classBlock.data.className.length > 0;
+            }
+        },
+        {
+            target: '.category-functions',
+            message: 'Click on "Functions" to see function-related blocks',
+            position: 'right',
+            autoAdvance: false
+        },
+        {
+            target: '[data-block-type="function_definition"]',
+            message: 'Drag a "Function Definition" block to the workspace - this will be a method in our class',
+            position: 'right',
+            waitForBlock: block => block.type === 'function_definition'
+        },
+        {
+            target: '.connector-parent',
+            message: 'Connect the Class block\'s output connector to the Function block\'s input connector',
+            position: 'right',
+            waitForConnection: conn => {
+                const fromBlock = blocks.find(b => b.id === conn.fromBlockId);
+                const toBlock = blocks.find(b => b.id === conn.toBlockId);
+                return fromBlock && toBlock && 
+                    fromBlock.type === 'class_definition' && 
+                    toBlock.type === 'function_definition';
+            },
+            highlightConnectors: true
+        },
+        {
+            target: '[data-block-type="function_definition"] input',
+            message: 'Name your function (e.g. "calculate")',
+            position: 'bottom',
+            waitForAction: element => {
+                const functionBlock = blocks.find(b => b.type === 'function_definition');
+                return functionBlock && functionBlock.data.funcName && functionBlock.data.funcName.length > 0;
+            }
+        },
+        {
+            target: '.category-logic',
+            message: 'Let\'s add some logic. Click on "Logic" to see logic blocks',
+            position: 'right',
+            autoAdvance: false
+        },
+        {
+            target: '[data-block-type="if_condition"]',
+            message: 'Drag an "If Condition" block to the workspace',
+            position: 'right',
+            waitForBlock: block => block.type === 'if_condition'
+        },
+        {
+            target: '.connector-parent',
+            message: 'Connect the Function block\'s output to the If block\'s input',
+            position: 'right',
+            waitForConnection: conn => {
+                const fromBlock = blocks.find(b => b.id === conn.fromBlockId);
+                const toBlock = blocks.find(b => b.id === conn.toBlockId);
+                return fromBlock && toBlock && 
+                    fromBlock.type === 'function_definition' && 
+                    toBlock.type === 'if_condition';
+            },
+            highlightConnectors: true
+        },
+        {
+            target: '[data-block-type="if_condition"] input',
+            message: 'Type a condition (e.g. "x > 0")',
+            position: 'bottom',
+            waitForAction: element => {
+                const ifBlock = blocks.find(b => b.type === 'if_condition');
+                return ifBlock && ifBlock.data.condition_text && ifBlock.data.condition_text.length > 0;
+            }
+        },
+        {
+            target: '.category-input-output',
+            message: 'Finally, add some output. Click on "Input/Output"',
+            position: 'right',
+            autoAdvance: false
+        },
+        {
+            target: '[data-block-type="log_message"]',
+            message: 'Drag a "Log Message" block to the workspace',
+            position: 'right',
+            waitForBlock: block => block.type === 'log_message'
+        },
+        {
+            target: '.connector-parent',
+            message: 'Connect the If block\'s "True" branch to the Log Message block',
+            position: 'right',
+            waitForConnection: conn => {
+                const fromBlock = blocks.find(b => b.id === conn.fromBlockId);
+                const toBlock = blocks.find(b => b.id === conn.toBlockId);
+                return fromBlock && toBlock && 
+                    fromBlock.type === 'if_condition' && 
+                    toBlock.type === 'log_message';
+            },
+            highlightConnectors: true
+        },
+        {
+            target: '[data-block-type="log_message"] input',
+            message: 'Type a message to log (e.g. "Condition is true!")',
+            position: 'bottom',
+            waitForAction: element => {
+                const logBlock = blocks.find(b => b.type === 'log_message');
+                return logBlock && logBlock.data.message && logBlock.data.message.length > 0;
+            }
+        },
+        {
+            target: '#generate-code-btn',
+            message: 'Great job! Now click "Generate Code" to see your complete JavaScript program.',
+            position: 'left'
+        },
+        {
+            target: '#generated-code',
+            message: 'You\'ve created a class with a method that includes conditional logic! This is the essence of visual programming with ScriptFlow.',
+            position: 'top'
         }
-    },
-    {
-        target: '#generate-code-btn',
-        message: 'Great job! Now click "Generate Code" to see your complete JavaScript program.',
-        position: 'left'
-    },
-    {
-        target: '#generated-code',
-        message: 'You\'ve created a class with a method that includes conditional logic! This is the essence of visual programming with ScriptFlow.',
-        position: 'top'
+    ];
+
+     // Initialize the block loader system
+    if (typeof window.BlockLoader !== 'undefined') {
+        // Add a small delay to ensure blocks.js is fully loaded
+        setTimeout(() => {
+            window.BlockLoader.init();
+        }, 100);
     }
-];
+
+    // Add refresh function for block palette
+    window.refreshBlockPalette = function() {
+        // Check if BLOCK_DEFINITIONS exists and has content before rebuilding
+        if (typeof window.BLOCK_DEFINITIONS === 'undefined' || 
+            Object.keys(window.BLOCK_DEFINITIONS).length === 0) {
+            console.warn('BLOCK_DEFINITIONS is empty or undefined, skipping palette refresh');
+            return;
+        }
+        
+        // Clear current palette
+        blockPalette.innerHTML = '';
+        
+        // Rebuild palette with current block definitions
+        populateBlockPalette();
+    };
+
+    // Make populateBlockPalette globally accessible
+    window.populateBlockPalette = populateBlockPalette;
+
+    // Add clear workspace function
+    window.clearWorkspace = function() {
+        if (confirm('Clear workspace? This will remove all blocks.')) {
+            blocks = [];
+            connections = [];
+            workspace.innerHTML = '';
+            saveState();
+        }
+    };
 
     // Make sure SVG layer covers the entire workspace area initially
     adjustSvgLayerSize();
@@ -817,37 +851,100 @@ document.addEventListener('DOMContentLoaded', () => {
             collapseBtn.innerHTML = '−';
             collapseBtn.title = 'Collapse Block';
             
-            // Show connectors with animation
-            setTimeout(() => {
-                const connectors = blockElement.querySelectorAll('.connector');
-                connectors.forEach(connector => {
-                    if (!connector.classList.contains('connector-child') && 
-                        !connector.classList.contains('connector-parent')) {
-                        connector.style.display = 'flex';
-                    }
-                });
-                updateAllConnectionLines();
-            }, 150);
+            // Show all connectors and restore their original positions
+            const connectors = blockElement.querySelectorAll('.connector');
+            connectors.forEach(connector => {
+                connector.style.display = 'flex';
+                
+                // Restore original position from stored values
+                const id = `${connector.dataset.connectorType}-${connector.dataset.connectorName}`;
+                const originalPos = blockObject.originalConnectorPositions?.[id];
+                
+                if (originalPos) {
+                    connector.style.top = originalPos.top || '';
+                    connector.style.bottom = originalPos.bottom || '';
+                    connector.style.left = originalPos.left || '';
+                    connector.style.right = originalPos.right || '';
+                    connector.style.transform = originalPos.transform || '';
+                } else {
+                    // Fallback: clear all positioning to let CSS take over
+                    connector.style.top = '';
+                    connector.style.bottom = '';
+                    connector.style.left = '';
+                    connector.style.right = '';
+                    connector.style.transform = '';
+                }
+            });
         } else {
-            // Collapse block
+            // Collapse block - IMPORTANT: Preserve the block's absolute position
+            const currentLeft = blockElement.style.left;
+            const currentTop = blockElement.style.top;
+            
             blockElement.classList.add('collapsed');
             collapseBtn.innerHTML = '+';
             collapseBtn.title = 'Expand Block';
             
-            // Hide non-essential connectors
+            // CRITICAL: Force the block to maintain its exact position
+            blockElement.style.left = currentLeft;
+            blockElement.style.top = currentTop;
+            blockElement.style.position = 'absolute'; // Ensure it's absolutely positioned
+            
+            // Hide non-essential connectors (CSS will handle showing and positioning essential ones)
             const connectors = blockElement.querySelectorAll('.connector');
             connectors.forEach(connector => {
                 if (!connector.classList.contains('connector-child') && 
-                    !connector.classList.contains('connector-parent')) {
+                    !connector.classList.contains('connector-parent') &&
+                    !connector.classList.contains('connector-input') &&
+                    !connector.classList.contains('connector-output')) {
                     connector.style.display = 'none';
                 }
             });
-            
-            updateAllConnectionLines();
         }
+        
+        // Force update connection lines after a short delay to ensure DOM and CSS have updated
+        setTimeout(() => {
+            updateAllConnectionLines();
+        }, 100);
         
         // Save state after collapsing/expanding
         saveState();
+    }
+
+    function makeBlockCollapsible(blockElement, blockObject) {
+        // Create collapse button
+        const collapseBtn = document.createElement('button');
+        collapseBtn.className = 'block-collapse-btn';
+        collapseBtn.innerHTML = '−';
+        collapseBtn.title = 'Collapse/Expand Block';
+        
+        // Store original connector positions when block is first created
+        blockObject.originalConnectorPositions = {};
+        
+        // Add collapse functionality
+        collapseBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleBlockCollapse(blockElement, blockObject, collapseBtn);
+        });
+        
+        blockElement.appendChild(collapseBtn);
+        
+        // Store original height for animation
+        blockObject.originalHeight = blockElement.offsetHeight;
+        
+        // Store original connector positions after a short delay to ensure everything is rendered
+        setTimeout(() => {
+            const connectors = blockElement.querySelectorAll('.connector');
+            connectors.forEach(connector => {
+                const id = `${connector.dataset.connectorType}-${connector.dataset.connectorName}`;
+                blockObject.originalConnectorPositions[id] = {
+                    top: connector.style.top,
+                    bottom: connector.style.bottom,
+                    left: connector.style.left,
+                    right: connector.style.right,
+                    transform: connector.style.transform
+                };
+            });
+        }, 50);
     }
     
     function showTutorial() {
@@ -1398,12 +1495,27 @@ document.addEventListener('DOMContentLoaded', () => {
             'Functions': '#6366f1',    // Indigo
             'Arrays': '#f59e0b',       // Amber
             'Objects': '#14b8a6',      // Teal
+
+            // HTML categories
+            'HTML Structure': '#e11d48', // Red
+            'HTML Content': '#2563eb',   // Blue
+            'HTML Layout': '#7c3aed',    // Purple
+            'HTML UI Elements': '#ea580c', // Orange
+            'HTML Forms': '#b45309',     // Orange-brown
+            'HTML Media': '#dc2626',     // Red
+            'HTML Tables': '#16a34a',    // Green
             'Misc': '#6b7280'          // Gray
         };
         
         // Group blocks by category
         const categories = {};
         Object.values(BLOCK_DEFINITIONS).forEach(def => {
+            // Safety check for each definition
+            if (!def) {
+                console.warn('Undefined block definition found');
+                return;
+            }
+            
             const category = def.category || 'Misc';
             if (!categories[category]) {
                 categories[category] = [];
@@ -1542,12 +1654,19 @@ document.addEventListener('DOMContentLoaded', () => {
         if (step.target.includes('category-') && !step.target.includes('category-content')) {
             const categoryContainer = document.querySelector(step.target);
             if (categoryContainer) {
+                // Scroll the category into view in the palette
+                categoryContainer.scrollIntoView({ 
+                    behavior: 'smooth', 
+                    block: 'center',
+                    inline: 'nearest'
+                });
+                
                 const categoryContent = categoryContainer.querySelector('.category-content');
                 if (categoryContent && categoryContent.classList.contains('collapsed')) {
                     const header = categoryContainer.querySelector('.category-header');
                     if (header) {
                         console.log(`Automatically expanding category for tutorial step`);
-                        //header.click();
+                        header.click();
                     }
                 }
             }
@@ -1570,6 +1689,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     const categoryContainer = document.querySelector(`.category-${categorySlug}`);
                     
                     if (categoryContainer) {
+                        // Scroll the category into view
+                        categoryContainer.scrollIntoView({ 
+                            behavior: 'smooth', 
+                            block: 'center',
+                            inline: 'nearest'
+                        });
+                        
                         const categoryContent = categoryContainer.querySelector('.category-content');
                         if (categoryContent && categoryContent.classList.contains('collapsed')) {
                             const header = categoryContainer.querySelector('.category-header');
@@ -1612,6 +1738,18 @@ document.addEventListener('DOMContentLoaded', () => {
         // Expand categories if needed based on the step
         if (step.target.includes('category')) {
             expandCategoryForStep(step);
+            
+            // Give time for the category to expand and scroll
+            setTimeout(() => {
+                let targetEl = document.querySelector(step.target);
+                if (targetEl) {
+                    createAndPositionTooltip(targetEl, step);
+                } else {
+                    console.warn(`Tutorial target not found after category expansion: ${step.target}`);
+                    setTimeout(() => showTutorialStep(stepIndex + 1), 1000);
+                }
+            }, 600); // Increased delay to allow for smooth scrolling
+            return;
         }
         
         // Find target element with retry mechanism
@@ -1624,7 +1762,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 let retryTarget = document.querySelector(step.target);
                 if (retryTarget) {
                     console.log(`Target ${step.target} found on retry`);
-                    createAndPositionTooltip(retryTarget, step);
+                    
+                    // Scroll target into view if it's in the palette
+                    if (blockPalette.contains(retryTarget)) {
+                        retryTarget.scrollIntoView({ 
+                            behavior: 'smooth', 
+                            block: 'center',
+                            inline: 'nearest'
+                        });
+                        
+                        // Wait for scroll to complete before showing tooltip
+                        setTimeout(() => {
+                            createAndPositionTooltip(retryTarget, step);
+                        }, 300);
+                    } else {
+                        createAndPositionTooltip(retryTarget, step);
+                    }
                 } else {
                     console.warn(`Tutorial target still not found even after retry: ${step.target}`);
                     // Move to next step after a short delay if target cannot be found
@@ -1634,7 +1787,21 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         
-        createAndPositionTooltip(targetEl, step);
+        // Scroll target into view if it's in the palette
+        if (blockPalette.contains(targetEl)) {
+            targetEl.scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'center',
+                inline: 'nearest'
+            });
+            
+            // Wait for scroll to complete before showing tooltip
+            setTimeout(() => {
+                createAndPositionTooltip(targetEl, step);
+            }, 300);
+        } else {
+            createAndPositionTooltip(targetEl, step);
+        }
     }
 
     function setupTutorialStepListeners(targetEl, step, stepIndex) {
@@ -1715,7 +1882,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         
-        // For custom action checking
+        // For custom action checking - Fixed to handle category expansion properly
         if (step.waitForAction && typeof step.waitForAction === 'function') {
             const checkForAction = () => {
                 if (step.waitForAction(targetEl)) {
@@ -1729,6 +1896,36 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             };
             setTimeout(checkForAction, 500);
+        }
+        
+        // Special handling for category steps that need to wait for user interaction
+        if (step.autoAdvance === false && step.target.includes('category-')) {
+            const categoryContainer = targetEl;
+            const categoryContent = categoryContainer.querySelector('.category-content');
+            const header = categoryContainer.querySelector('.category-header');
+            
+            if (header && categoryContent) {
+                const originalClickHandler = header.onclick;
+                
+                // Override the header click to advance tutorial
+                const tutorialClickHandler = () => {
+                    // Call original click handler
+                    if (originalClickHandler) originalClickHandler();
+                    
+                    // Check if category was expanded
+                    setTimeout(() => {
+                        if (!categoryContent.classList.contains('collapsed')) {
+                            targetEl.classList.remove('tutorial-highlight');
+                            showTutorialStep(stepIndex + 1);
+                            
+                            // Restore original click handler
+                            header.onclick = originalClickHandler;
+                        }
+                    }, 100);
+                };
+                
+                header.onclick = tutorialClickHandler;
+            }
         }
     }
     
@@ -1803,20 +2000,18 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         if (activeDrag && activeDrag.isNew) {
             const type = e.dataTransfer.getData('text/plain') || activeDrag.type;
+            
+            // FIXED: Get the actual workspace element bounds in the transformed space
             const workspaceRect = workspace.getBoundingClientRect();
             
-            // Get mouse position in screen coordinates
-            const mouseScreenX = e.clientX;
-            const mouseScreenY = e.clientY;
+            // Calculate position relative to the workspace
+            const relativeX = e.clientX - workspaceRect.left;
+            const relativeY = e.clientY - workspaceRect.top;
             
-            // Get mouse position relative to workspace's top-left corner on screen
-            const relativeX = mouseScreenX - workspaceRect.left;
-            const relativeY = mouseScreenY - workspaceRect.top;
-            
-            // Convert to model coordinates accounting for transform
-            // FIXED: The calculation needs to divide by scale first, then add pan values
-            const modelX = (relativeX / scale);// + panX;
-            const modelY = (relativeY / scale);// + panY;
+            // Since workspace has CSS transform applied, convert back to model coordinates
+            // The transform is: transform: matrix(scale, 0, 0, scale, 0, 0)
+            const modelX = relativeX / scale;
+            const modelY = relativeY / scale;
             
             // Create a block with the correct type
             const blockDefinition = BLOCK_DEFINITIONS[type];
@@ -1826,23 +2021,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // Create the block at the calculated model position
-            const block = createBlock(type, modelX, modelY);
+            // Create the block at the calculated position
+            const block = createBlock(type, modelX - 75, modelY - 50); // Center the block
             
-            // After block is created, center it on the cursor position
-            requestAnimationFrame(() => {
-                if (block && block.element) {
-                    const blockWidth = block.element.offsetWidth;
-                    const blockHeight = block.element.offsetHeight;
-                    
-                    // Center the block on the cursor
-                    block.element.style.left = `${modelX - blockWidth/2}px`;
-                    block.element.style.top = `${modelY - blockHeight/2}px`;
-                    
-                    updateAllConnectionLines();
-                    saveState();
-                }
-            });
+            if (block) {
+                updateAllConnectionLines();
+                saveState();
+            }
         }
         activeDrag = null;
     });
