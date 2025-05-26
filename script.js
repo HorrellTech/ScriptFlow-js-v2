@@ -2073,116 +2073,101 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Add input fields from 'inputs' array in definition
         if (definition.inputs) {
-            definition.inputs.forEach(inputDef => {
-                const labelEl = document.createElement('label');
-                labelEl.textContent = inputDef.label || inputDef.name;
-                content.appendChild(labelEl);
+            definition.inputs.forEach(input => {
+                const inputContainer = document.createElement('div');
+                inputContainer.className = 'input-container';
 
-                let inputField;
-                
-                // Set default value in blockData
-                let defaultValue;
-                switch(inputDef.type) {
-                    case "boolean":
-                        defaultValue = false;
-                        break;
-                    case "number":
-                        defaultValue = 0;
-                        break;
-                    case "select":
-                        defaultValue = inputDef.options && inputDef.options[0] ? inputDef.options[0].value : "";
-                        break;
-                    default:
-                        defaultValue = "";
-                        break;
-                }
-                blockData[inputDef.name] = defaultValue;
-                
-                // Create different input types based on the input definition
-                switch(inputDef.type) {
-                    case "boolean":
-                        inputField = document.createElement('input');
-                        inputField.type = "checkbox";
-                        inputField.checked = defaultValue;
-                        inputField.classList.add('input-checkbox');
-                        inputField.addEventListener('change', e => {
-                            blockData[inputDef.name] = e.target.checked;
-                            console.log(`Updated ${inputDef.name}:`, e.target.checked);
-                        });
-                        break;
-                        
-                    case "number":
-                        inputField = document.createElement('input');
-                        inputField.type = "number";
-                        inputField.value = defaultValue;
-                        inputField.classList.add('input-number');
-                        inputField.addEventListener('input', e => {
-                            blockData[inputDef.name] = parseFloat(e.target.value) || 0;
-                            console.log(`Updated ${inputDef.name}:`, blockData[inputDef.name]);
-                        });
-                        break;
-                        
-                    case "multiline":
-                        inputField = document.createElement('textarea');
-                        inputField.value = defaultValue;
-                        inputField.rows = inputDef.rows || 3;
-                        inputField.classList.add('input-multiline');
-                        inputField.addEventListener('input', e => {
-                            blockData[inputDef.name] = e.target.value;
-                            console.log(`Updated ${inputDef.name}:`, e.target.value);
-                        });
-                        break;
+                const label = document.createElement('label');
+                label.textContent = input.label || input.name;
+                label.className = 'input-label';
+                inputContainer.appendChild(label);
 
-                    case "select":
-                        inputField = document.createElement('select');
-                        inputField.classList.add('input-select');
-                        
-                        // Add options from definition
-                        if (inputDef.options) {
-                            inputDef.options.forEach(option => {
-                                const optionEl = document.createElement('option');
-                                optionEl.value = option.value;
-                                optionEl.textContent = option.label;
-                                inputField.appendChild(optionEl);
-                            });
-                        }
-                        
-                        inputField.value = defaultValue;
-                        inputField.addEventListener('change', e => {
-                            blockData[inputDef.name] = e.target.value;
-                            console.log(`Updated ${inputDef.name}:`, e.target.value);
+                let inputElement;
+                if (input.type === 'select') {
+                    inputElement = document.createElement('select');
+                    inputElement.className = 'block-input block-select';
+                    if (input.options) {
+                        input.options.forEach(option => {
+                            const optionElement = document.createElement('option');
+                            optionElement.value = option.value;
+                            optionElement.textContent = option.label;
+                            inputElement.appendChild(optionElement);
                         });
-                        break;
-                            
-                    case "string":
-                    default:
-                        inputField = document.createElement('input');
-                        inputField.type = "text";
-                        inputField.value = defaultValue;
-                        inputField.classList.add('input-text');
-                        inputField.addEventListener('input', e => {
-                            blockData[inputDef.name] = e.target.value;
-                            console.log(`Updated ${inputDef.name}:`, e.target.value);
-                        });
-                        break;
-                }
-                
-                // Common properties for all input types
-                inputField.placeholder = inputDef.placeholder || inputDef.name;
-                inputField.dataset.inputName = inputDef.name;
-                
-                // Add any additional attributes from the input definition
-                if (inputDef.attributes) {
-                    Object.entries(inputDef.attributes).forEach(([key, value]) => {
-                        inputField.setAttribute(key, value);
+                    }
+                } else if (input.type === 'boolean') {
+                    inputElement = document.createElement('input');
+                    inputElement.type = 'checkbox';
+                    inputElement.className = 'block-input block-checkbox';
+                } else if (input.type === 'number') {
+                    inputElement = document.createElement('input');
+                    inputElement.type = 'number';
+                    inputElement.className = 'block-input block-number';
+                    if (input.min !== undefined) inputElement.min = input.min;
+                    if (input.max !== undefined) inputElement.max = input.max;
+                    if (input.step !== undefined) inputElement.step = input.step;
+                } else if (input.type === 'multiline') {
+                    inputElement = document.createElement('textarea');
+                    inputElement.className = 'block-input block-textarea';
+                    inputElement.rows = input.rows || 3;
+                } else if (input.type === 'color') {
+                    // New color picker input type
+                    const colorContainer = document.createElement('div');
+                    colorContainer.className = 'color-input-container';
+                    
+                    inputElement = document.createElement('input');
+                    inputElement.type = 'color';
+                    inputElement.className = 'block-input block-color';
+                    inputElement.value = input.defaultValue || '#000000';
+                    
+                    const colorText = document.createElement('input');
+                    colorText.type = 'text';
+                    colorText.className = 'block-input block-color-text';
+                    colorText.value = input.defaultValue || '#000000';
+                    colorText.placeholder = '#000000';
+                    
+                    // Sync color picker and text input
+                    inputElement.addEventListener('input', (e) => {
+                        colorText.value = e.target.value;
+                        blockData[input.name] = e.target.value;
+                        saveState();
                     });
+                    
+                    colorText.addEventListener('input', (e) => {
+                        if (/^#[0-9A-F]{6}$/i.test(e.target.value)) {
+                            inputElement.value = e.target.value;
+                        }
+                        blockData[input.name] = e.target.value;
+                        saveState();
+                    });
+                    
+                    colorContainer.appendChild(inputElement);
+                    colorContainer.appendChild(colorText);
+                    inputContainer.appendChild(colorContainer);
+                    
+                    // Set initial value
+                    blockData[input.name] = input.defaultValue || '#000000';
+                    continue; // Skip the normal input element creation
+                } else {
+                    inputElement = document.createElement('input');
+                    inputElement.type = 'text';
+                    inputElement.className = 'block-input block-text';
+                    if (input.placeholder) inputElement.placeholder = input.placeholder;
                 }
-                
-                content.appendChild(inputField);
-                
-                // Only add line break after non-checkbox inputs
-                if (inputDef.type !== "boolean") {
-                    content.appendChild(document.createElement('br'));
+
+                inputElement.addEventListener('input', (e) => {
+                    const value = input.type === 'boolean' ? e.target.checked : e.target.value;
+                    blockData[input.name] = value;
+                    saveState();
+                });
+
+                inputContainer.appendChild(inputElement);
+                content.appendChild(inputContainer);
+
+                // Set initial value in blockData
+                if (input.type === 'boolean') {
+                    blockData[input.name] = input.defaultValue || false;
+                } else {
+                    blockData[input.name] = input.defaultValue || '';
                 }
             });
         }
@@ -3320,6 +3305,41 @@ document.addEventListener('DOMContentLoaded', () => {
         // Also adjust SVG layer
         adjustSvgLayerSize();
     }
+
+    // Helper function to get child blocks of a container block
+    window.getChildBlocks = function(parentBlock) {
+        const childBlocks = [];
+        
+        // Find all blocks that are connected to this block's branch output
+        connections.forEach(conn => {
+            if (conn.fromBlock === parentBlock.id && conn.fromType === 'branch') {
+                const childBlock = blocks.find(b => b.id === conn.toBlock);
+                if (childBlock) {
+                    childBlocks.push(childBlock);
+                }
+            }
+        });
+        
+        // Sort by connection order or position
+        childBlocks.sort((a, b) => a.y - b.y);
+        
+        return childBlocks;
+    };
+
+    // Helper function to generate code from a list of blocks
+    window.generateCodeFromBlocks = function(blockList, context) {
+        let code = "";
+        
+        blockList.forEach(block => {
+            const blockDef = BLOCK_DEFINITIONS[block.type];
+            if (blockDef && blockDef.toCode) {
+                const blockCode = blockDef.toCode(block, context);
+                code += blockCode;
+            }
+        });
+        
+        return code;
+    };
 
     // Zoom and Pan functions
     function setupZoomPan() {

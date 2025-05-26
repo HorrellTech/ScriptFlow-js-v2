@@ -1,0 +1,138 @@
+/*
+    * Block Loader Module
+    * This module allows dynamic loading of different sets of blocks (JavaScript, HTML, CSS)
+    * and provides a UI for switching between them.
+    * It initializes with a default block set and allows users to switch sets via a dropdown.
+    * 
+    * ========================================
+    * HOW TO ADD A NEW BLOCK SET
+    * ========================================
+    * 
+    * To add your own custom block set, follow these steps:
+    * 
+    * 1. CREATE A NEW BLOCK DEFINITIONS FILE
+    *    - Create a new JavaScript file (e.g., "blocks-python.js", "blocks-sql.js")
+    * 
+    * 2. DEFINE YOUR BLOCK DEFINITIONS OBJECT
+    *    - Follow this structure in your new file:
+    * 
+    *    if (typeof window.YOUR_BLOCK_DEFINITIONS === 'undefined') {
+    *        window.YOUR_BLOCK_DEFINITIONS = {
+    *            "your_block_type": {
+    *                type: "your_block_type",
+    *                label: "Your Block Name",
+    *                color: "#hex_color",
+    *                category: "Your Category",
+    *                hasFlowIn: true/false,
+    *                hasFlowOut: true/false,
+    *                hasNextFlowOut: true/false,
+    *                hasBranchFlowOut: true/false,  // For container blocks
+    *                isContainer: true/false,       // For blocks that contain other blocks
+    *                inputs: [
+    *                    { name: "input_name", type: "string|number|boolean|select|multiline|color", 
+    *                      label: "Display Name:", placeholder: "optional", defaultValue: "optional",
+    *                      options: [{ value: "val", label: "Label" }] // for select type
+    *                    }
+    *                ],
+    *                dataInputs: [  // For data connections
+    *                    { name: "data_input_name", type: "any|string|number|etc", label: "Input Label" }
+    *                ],
+    *                dataOutputs: [ // For data connections
+    *                    { name: "data_output_name", type: "any|string|number|etc", label: "Output Label" }
+    *                ],
+    *                toCode: function(block, nextBlockCode, branchBlockCode) {
+    *                    // Generate code for this block
+    *                    // Access user inputs via: block.data.input_name
+    *                    // Use getConnectedValue(block, "data_input_name") for data inputs
+    *                    return "generated code string";
+    *                },
+    *                getValue: function(block, context) {
+    *                    // For blocks with dataOutputs - return the value to pass to connected blocks
+    *                    return "output value";
+    *                }
+    *            },
+    *            // Add more block definitions...
+    *        };
+    *    }
+    * 
+    * 3. REGISTER YOUR BLOCK SET
+    *    - Add your block set to the availableBlockSets object below:
+    * 
+    *    'your_block_set_name': {
+    *        name: 'Display Name',
+    *        file: 'your-blocks-file.js',
+    *        loaded: false
+    *    }
+    * 
+    * 4. ADD ACTIVATION LOGIC
+    *    - Add a case to the activateBlockSet function switch statement:
+    * 
+    *    case 'your_block_set_name':
+    *        if (window.YOUR_BLOCK_DEFINITIONS) {
+    *            window.BLOCK_DEFINITIONS = { ...window.YOUR_BLOCK_DEFINITIONS };
+    *        } else {
+    *            console.warn('Your blocks not found');
+    *        }
+    *        break;
+    * 
+    * 5. UPDATE PLACEHOLDER (OPTIONAL)
+    *    - Add a case to updateCodeAreaPlaceholder function:
+    * 
+    *    case 'your_block_set_name':
+    *        codeArea.placeholder = 'Generated Your Language code will appear here...';
+    *        break;
+    * 
+    * ========================================
+    * BLOCK TYPES REFERENCE
+    * ========================================
+    * 
+    * INPUT TYPES:
+    * - "string": Text input field
+    * - "number": Number input with optional min, max, step
+    * - "boolean": Checkbox
+    * - "select": Dropdown with options array
+    * - "multiline": Textarea with optional rows parameter
+    * - "color": Color picker with hex input
+    * 
+    * FLOW PROPERTIES:
+    * - hasFlowIn: Block can be connected after another block
+    * - hasFlowOut: Block can connect to next block (deprecated, use hasNextFlowOut)
+    * - hasNextFlowOut: Block can connect to next sequential block
+    * - hasBranchFlowOut: Block can contain child blocks (like if/else, loops)
+    * - isContainer: Block acts as a container for other blocks
+    * 
+    * DATA CONNECTIONS:
+    * - dataInputs: Accept data values from other blocks
+    * - dataOutputs: Provide data values to other blocks
+    * - Use getConnectedValue(block, "input_name") to get connected data
+    * 
+    * HELPER FUNCTIONS AVAILABLE:
+    * - getConnectedValue(block, inputName): Get value from connected data input
+    * - addThisIfNeeded(varName, context): Add "this." prefix if in class context
+    * - getChildBlocks(parentBlock): Get blocks connected to branch output
+    * - generateCodeFromBlocks(blockList, context): Generate code from block array
+    * 
+    * ========================================
+    * EXAMPLE BLOCK DEFINITION
+    * ========================================
+    * 
+    * "print_statement": {
+    *     type: "print_statement",
+    *     label: "Print Statement",
+    *     color: "#3b82f6",
+    *     category: "Output",
+    *     hasFlowIn: true,
+    *     hasFlowOut: false,
+    *     hasNextFlowOut: true,
+    *     inputs: [
+    *         { name: "message", type: "string", label: "Message to print:" }
+    *     ],
+    *     dataInputs: [
+    *         { name: "dynamic_message", type: "string", label: "Dynamic Message" }
+    *     ],
+    *     toCode: function(block, nextBlockCode, branchBlockCode) {
+    *         let message = getConnectedValue(block, "dynamic_message") || block.data.message || "";
+    *         return `print("${message}")\n`;
+    *     }
+    * }
+    */

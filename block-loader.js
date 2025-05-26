@@ -10,6 +10,11 @@ window.BlockLoader = {
             name: 'HTML',
             file: 'blocks-html.js',
             loaded: false
+        },
+        'css': {
+            name: 'CSS',
+            file: 'blocks-css.js',
+            loaded: false
         }
     },
 
@@ -127,22 +132,24 @@ window.BlockLoader = {
                     console.warn('HTML blocks not found');
                 }
                 break;
+            case 'css':
+                if (window.CSS_BLOCK_DEFINITIONS) {
+                    window.BLOCK_DEFINITIONS = { ...window.CSS_BLOCK_DEFINITIONS };
+                } else {
+                    console.warn('CSS blocks not found');
+                }
+                break;
             default:
                 console.warn(`Unknown block set: ${blockSetName}`);
         }
         
         // Only refresh if we have block definitions
+        // Only refresh if we have block definitions
         if (Object.keys(window.BLOCK_DEFINITIONS).length > 0) {
-            // Clear workspace (optional - you might want to ask user first)
-            if (typeof window.clearWorkspace === 'function') {
-                // window.clearWorkspace();
-            }
-            
-            // Refresh the block palette - use the globally accessible function
+            // Refresh the block palette
             if (typeof window.refreshBlockPalette === 'function') {
                 window.refreshBlockPalette();
             } else if (typeof window.populateBlockPalette === 'function') {
-                // Fallback to direct call
                 window.populateBlockPalette();
             }
         } else {
@@ -179,6 +186,9 @@ window.BlockLoader = {
                     break;
                 case 'html':
                     codeArea.placeholder = 'Generated HTML code will appear here...';
+                    break;
+                case 'css':
+                    codeArea.placeholder = 'Generated CSS code will appear here...';
                     break;
                 default:
                     codeArea.placeholder = 'Generated code will appear here...';

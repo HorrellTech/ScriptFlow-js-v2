@@ -9,23 +9,9 @@ window.HTML_BLOCK_DEFINITIONS = {
     "start": {
         type: "start",
         label: "Start",
-        color: "#10b981", // Green
+        color: "#22c55e", // Green
         category: "HTML Structure",
         hasFlowIn: false,
-        hasFlowOut: false,
-        hasNextFlowOut: true,
-        hasBranchFlowOut: false,
-        inputs: [],
-        toCode: function() {
-            return "<!-- Start of HTML Document -->\n";
-        }
-    },
-    "html_document": {
-        type: "html_document",
-        label: "HTML Document",
-        color: "#e11d48", // Red
-        category: "HTML Structure",
-        hasFlowIn: true,
         hasFlowOut: false,
         hasNextFlowOut: true,
         hasBranchFlowOut: true,
@@ -34,6 +20,9 @@ window.HTML_BLOCK_DEFINITIONS = {
             { name: "title", type: "string", label: "Page Title:" },
             { name: "lang", type: "string", label: "Language (e.g., 'en'):" },
             { name: "charset", type: "string", label: "Character Set:" }
+        ],
+        dataInputs: [
+            { name: "head_content", type: "html", label: "Head Content" }
         ],
         toCode: function(block, nextBlockCode, branchBlockCode) {
             const title = block.data.title || "My Page";
@@ -44,6 +33,15 @@ window.HTML_BLOCK_DEFINITIONS = {
             code += `  <meta charset="${charset}">\n`;
             code += `  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n`;
             code += `  <title>${title}</title>\n`;
+            
+            // Add head content from connected blocks
+            if (typeof getConnectedValue === 'function') {
+                const headContent = getConnectedValue(block, "head_content");
+                if (headContent) {
+                    code += headContent.split('\n').map(line => line ? `  ${line}` : line).join('\n').trimEnd() + "\n";
+                }
+            }
+            
             code += `</head>\n<body>\n`;
             
             if (branchBlockCode) {
@@ -525,6 +523,211 @@ window.HTML_BLOCK_DEFINITIONS = {
             if (className) attributes += ` class="${className}"`;
             
             return `<label${attributes}>${text}</label>\n`;
+        }
+    },
+
+    "html_meta": {
+        type: "html_meta",
+        label: "Meta Tag",
+        color: "#1f2937", // Dark gray
+        category: "HTML Head",
+        hasFlowIn: false,
+        hasFlowOut: false,
+        hasNextFlowOut: true,
+        inputs: [
+            { name: "name", type: "string", label: "Name:" },
+            { name: "content", type: "string", label: "Content:" },
+            { name: "property", type: "string", label: "Property (optional):" },
+            { name: "httpEquiv", type: "string", label: "HTTP-Equiv (optional):" }
+        ],
+        dataOutputs: [
+            { name: "html_output", type: "html", label: "HTML" }
+        ],
+        toCode: function(block) {
+            // This is for when the block is used in flow context
+            const name = block.data.name || "";
+            const content = block.data.content || "";
+            const property = block.data.property || "";
+            const httpEquiv = block.data.httpEquiv || "";
+            
+            let attributes = "";
+            if (name) attributes += ` name="${name}"`;
+            if (property) attributes += ` property="${property}"`;
+            if (httpEquiv) attributes += ` http-equiv="${httpEquiv}"`;
+            if (content) attributes += ` content="${content}"`;
+            
+            return `<meta${attributes}>\n`;
+        },
+        getValue: function(block) {
+            // This is for when the block is used as a data output
+            const name = block.data.name || "";
+            const content = block.data.content || "";
+            const property = block.data.property || "";
+            const httpEquiv = block.data.httpEquiv || "";
+            
+            let attributes = "";
+            if (name) attributes += ` name="${name}"`;
+            if (property) attributes += ` property="${property}"`;
+            if (httpEquiv) attributes += ` http-equiv="${httpEquiv}"`;
+            if (content) attributes += ` content="${content}"`;
+            
+            return `<meta${attributes}>`;
+        }
+    },
+
+    "html_link_tag": {
+        type: "html_link_tag",
+        label: "Link Tag (CSS/Favicon)",
+        color: "#374151", // Gray
+        category: "HTML Head",
+        hasFlowIn: false,
+        hasFlowOut: false,
+        hasNextFlowOut: true,
+        inputs: [
+            { name: "rel", type: "select", label: "Relationship:", 
+            options: [
+                { value: "stylesheet", label: "Stylesheet" },
+                { value: "icon", label: "Icon/Favicon" },
+                { value: "shortcut icon", label: "Shortcut Icon" },
+                { value: "apple-touch-icon", label: "Apple Touch Icon" },
+                { value: "canonical", label: "Canonical" },
+                { value: "preload", label: "Preload" },
+                { value: "prefetch", label: "Prefetch" }
+            ]},
+            { name: "href", type: "string", label: "URL/Path:" },
+            { name: "type", type: "string", label: "Type (optional):" },
+            { name: "sizes", type: "string", label: "Sizes (optional):" }
+        ],
+        dataOutputs: [
+            { name: "html_output", type: "html", label: "HTML" }
+        ],
+        toCode: function(block) {
+            const rel = block.data.rel || "stylesheet";
+            const href = block.data.href || "";
+            const type = block.data.type || "";
+            const sizes = block.data.sizes || "";
+            
+            let attributes = ` rel="${rel}" href="${href}"`;
+            if (type) attributes += ` type="${type}"`;
+            if (sizes) attributes += ` sizes="${sizes}"`;
+            
+            return `<link${attributes}>\n`;
+        },
+        getValue: function(block) {
+            const rel = block.data.rel || "stylesheet";
+            const href = block.data.href || "";
+            const type = block.data.type || "";
+            const sizes = block.data.sizes || "";
+            
+            let attributes = ` rel="${rel}" href="${href}"`;
+            if (type) attributes += ` type="${type}"`;
+            if (sizes) attributes += ` sizes="${sizes}"`;
+            
+            return `<link${attributes}>`;
+        }
+    },
+
+    "html_script_tag": {
+        type: "html_script_tag",
+        label: "Script Tag",
+        color: "#4b5563", // Dark gray
+        category: "HTML Head",
+        hasFlowIn: false,
+        hasFlowOut: false,
+        hasNextFlowOut: true,
+        inputs: [
+            { name: "src", type: "string", label: "Source URL (optional):" },
+            { name: "type", type: "select", label: "Type:", 
+            options: [
+                { value: "text/javascript", label: "JavaScript" },
+                { value: "module", label: "ES6 Module" },
+                { value: "text/json", label: "JSON" }
+            ]},
+            { name: "async", type: "boolean", label: "Async:" },
+            { name: "defer", type: "boolean", label: "Defer:" },
+            { name: "content", type: "multiline", label: "Inline Script Content:", rows: 5 }
+        ],
+        dataInputs: [
+            { name: "javascript_code", type: "javascript", label: "JavaScript Code" }
+        ],
+        dataOutputs: [
+            { name: "html_output", type: "html", label: "HTML" }
+        ],
+        toCode: function(block) {
+            const src = block.data.src || "";
+            const type = block.data.type || "text/javascript";
+            const async = block.data.async === true;
+            const defer = block.data.defer === true;
+            let content = block.data.content || "";
+            
+            // Check for connected JavaScript code
+            if (typeof getConnectedValue === 'function') {
+                const connectedCode = getConnectedValue(block, "javascript_code");
+                if (connectedCode) {
+                    content = connectedCode;
+                }
+            }
+            
+            let attributes = ` type="${type}"`;
+            if (src) attributes += ` src="${src}"`;
+            if (async) attributes += ` async`;
+            if (defer) attributes += ` defer`;
+            
+            if (content && !src) {
+                return `<script${attributes}>\n${content}\n</script>\n`;
+            } else {
+                return `<script${attributes}></script>\n`;
+            }
+        },
+        getValue: function(block) {
+            const src = block.data.src || "";
+            const type = block.data.type || "text/javascript";
+            const async = block.data.async === true;
+            const defer = block.data.defer === true;
+            let content = block.data.content || "";
+            
+            // Check for connected JavaScript code
+            if (typeof getConnectedValue === 'function') {
+                const connectedCode = getConnectedValue(block, "javascript_code");
+                if (connectedCode) {
+                    content = connectedCode;
+                }
+            }
+            
+            let attributes = ` type="${type}"`;
+            if (src) attributes += ` src="${src}"`;
+            if (async) attributes += ` async`;
+            if (defer) attributes += ` defer`;
+            
+            if (content && !src) {
+                return `<script${attributes}>\n${content}\n</script>`;
+            } else {
+                return `<script${attributes}></script>`;
+            }
+        }
+    },
+
+    "html_style_tag": {
+        type: "html_style_tag",
+        label: "Style Tag",
+        color: "#6b7280", // Gray
+        category: "HTML Head",
+        hasFlowIn: false,
+        hasFlowOut: false,
+        hasNextFlowOut: true,
+        inputs: [
+            { name: "css", type: "multiline", label: "CSS Content:", rows: 8 }
+        ],
+        dataOutputs: [
+            { name: "html_output", type: "html", label: "HTML" }
+        ],
+        toCode: function(block) {
+            const css = block.data.css || "";
+            return `<style>\n${css}\n</style>\n`;
+        },
+        getValue: function(block) {
+            const css = block.data.css || "";
+            return `<style>\n${css}\n</style>`;
         }
     }
 };

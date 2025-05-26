@@ -1196,6 +1196,63 @@ if (typeof window.JAVASCRIPT_BLOCK_DEFINITIONS === 'undefined') {
                 
                 return code;
             }
+        },
+
+        "javascript_code_block": {
+            type: "javascript_code_block",
+            label: "JavaScript Code Block",
+            color: "#1e293b", // Dark slate
+            category: "Functions",
+            hasFlowIn: true,
+            hasFlowOut: false,
+            hasNextFlowOut: true,
+            hasBranchFlowOut: true,
+            isContainer: true,
+            inputs: [
+                { name: "description", type: "string", label: "Description (optional):" }
+            ],
+            dataOutputs: [
+                { name: "code_output", type: "javascript", label: "JavaScript Code" }
+            ],
+            toCode: function(block, nextBlockCode, branchBlockCode) {
+                // When used in flow context, just execute the branch code
+                if (branchBlockCode) {
+                    return branchBlockCode;
+                }
+                return "";
+            },
+            getValue: function(block, context) {
+                // When used as a data output, return the generated code from child blocks
+                const childBlocks = getChildBlocks(block); // You'll need to implement this function
+                let code = "";
+                
+                if (childBlocks && childBlocks.length > 0) {
+                    code = generateCodeFromBlocks(childBlocks, context); // You'll need to implement this function
+                }
+                
+                return code;
+            }
+        },
+
+        "raw_javascript": {
+            type: "raw_javascript",
+            label: "Raw JavaScript",
+            color: "#374151", // Gray
+            category: "Functions",
+            hasFlowIn: false,
+            hasFlowOut: false,
+            inputs: [
+                { name: "code", type: "multiline", label: "JavaScript Code:", rows: 8 }
+            ],
+            dataOutputs: [
+                { name: "code_output", type: "javascript", label: "JavaScript Code" }
+            ],
+            toCode: function(block) {
+                return ""; // This block doesn't generate code in flow context
+            },
+            getValue: function(block) {
+                return block.data.code || "";
+            }
         }
     };
 }
