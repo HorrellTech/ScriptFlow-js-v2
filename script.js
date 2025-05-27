@@ -727,10 +727,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function setupTouchEvents() {
         let touchStarted = false;
-        let initialDistance = 0;
-        let initialScale = 1;
         let isDraggingBlock = false;
         let touchTarget = null;
+        let twoFingerPanning = false;
+        let lastTwoFingerCenter = null;
         
         // Touch start
         workspace.addEventListener('touchstart', (e) => {
@@ -763,18 +763,24 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             if (e.touches.length === 1 && !isDraggingBlock) {
+                // Single finger - prepare for potential panning but don't start yet
                 touchStartX = e.touches[0].clientX;
                 touchStartY = e.touches[0].clientY;
+                twoFingerPanning = false;
+                e.preventDefault(); // Prevent scrolling
             } else if (e.touches.length === 2) {
-                // Pinch to zoom setup
+                // Two fingers - start panning mode
+                twoFingerPanning = true;
                 const touch1 = e.touches[0];
                 const touch2 = e.touches[1];
-                initialDistance = Math.hypot(
-                    touch2.clientX - touch1.clientX,
-                    touch2.clientY - touch1.clientY
-                );
-                initialScale = scale;
-                isPanning = true;
+                
+                // Calculate center point of two fingers
+                lastTwoFingerCenter = {
+                    x: (touch1.clientX + touch2.clientX) / 2,
+                    y: (touch1.clientY + touch2.clientY) / 2
+                };
+                
+                e.preventDefault(); // Prevent any default behavior
             }
         }, { passive: false });
         
@@ -782,46 +788,50 @@ document.addEventListener('DOMContentLoaded', () => {
         workspace.addEventListener('touchmove', (e) => {
             if (!touchStarted) return;
             
+            // Always prevent default to stop scrolling
+            e.preventDefault();
+            
             // Check if we're dragging a block
             if (isDraggingBlock) {
                 // Let the block's touch handling take over
                 return;
             }
             
-            if (e.touches.length === 1 && isPanning && !isDraggingBlock) {
-                // Single finger pan - only if not dragging a block
-                const deltaX = (e.touches[0].clientX - touchStartX) / scale;
-                const deltaY = (e.touches[0].clientY - touchStartY) / scale;
-                
-                // Move all blocks
-                blocks.forEach(block => {
-                    const left = parseFloat(block.element.style.left) || 0;
-                    const top = parseFloat(block.element.style.top) || 0;
-                    
-                    block.element.style.left = `${left + deltaX}px`;
-                    block.element.style.top = `${top + deltaY}px`;
-                });
-                
-                touchStartX = e.touches[0].clientX;
-                touchStartY = e.touches[0].clientY;
-                updateAllConnectionLines();
-                
-                e.preventDefault();
-            } else if (e.touches.length === 2) {
-                // Pinch to zoom
+            if (e.touches.length === 2 && twoFingerPanning) {
+                // Two finger panning
                 const touch1 = e.touches[0];
                 const touch2 = e.touches[1];
-                const currentDistance = Math.hypot(
-                    touch2.clientX - touch1.clientX,
-                    touch2.clientY - touch1.clientY
-                );
                 
-                const newScale = Math.max(0.2, Math.min(3, initialScale * (currentDistance / initialDistance)));
-                scale = newScale;
-                applyZoomOnly();
+                // Calculate new center point
+                const newCenter = {
+                    x: (touch1.clientX + touch2.clientX) / 2,
+                    y: (touch1.clientY + touch2.clientY) / 2
+                };
                 
-                e.preventDefault();
+                if (lastTwoFingerCenter) {
+                    // Calculate movement delta
+                    const deltaX = (newCenter.x - lastTwoFingerCenter.x) / scale;
+                    const deltaY = (newCenter.y - lastTwoFingerCenter.y) / scale;
+                    
+                    // Move all blocks by this delta
+                    blocks.forEach(block => {
+                        const left = parseFloat(block.element.style.left) || 0;
+                        const top = parseFloat(block.element.style.top) || 0;
+                        
+                        block.element.style.left = `${left + deltaX}px`;
+                        block.element.style.top = `${top + deltaY}px`;
+                    });
+                    
+                    // Update connection lines
+                    updateAllConnectionLines();
+                }
+                
+                // Update last center for next move
+                lastTwoFingerCenter = newCenter;
             }
+            
+            // Prevent any other touch behavior
+            e.stopPropagation();
         }, { passive: false });
         
         // Touch end
@@ -842,18 +852,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 
                 if (e.touches.length === 0) {
-                    isPanning = false;
+                    // All fingers lifted
                     touchStarted = false;
                     isDraggingBlock = false;
+                    twoFingerPanning = false;
+                    lastTwoFingerCenter = null;
                     touchTarget = null;
                     
                     // Save state after touch interaction
                     if (touchDuration > 100) {
                         saveState();
                     }
+                } else if (e.touches.length === 1 && twoFingerPanning) {
+                    // Went from 2 fingers to 1 finger - stop panning
+                    twoFingerPanning = false;
+                    lastTwoFingerCenter = null;
                 }
                 
-                // Prevent double-tap zoom
+                // Prevent double-tap zoom and other default behaviors
+                e.preventDefault();
                 const now = Date.now();
                 if (now - lastTouchEnd <= 300) {
                     e.preventDefault();
@@ -868,6 +885,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 e.preventDefault();
             }
         });
+        
+        // Additional touch event prevention for workspace
+        workspace.addEventListener('touchcancel', (e) => {
+            e.preventDefault();
+            touchStarted = false;
+            isDraggingBlock = false;
+            twoFingerPanning = false;
+            lastTwoFingerCenter = null;
+            touchTarget = null;
+        }, { passive: false });
     }
 
     function makeBlockCollapsible(blockElement, blockObject) {
@@ -1272,7 +1299,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Add mobile navigation helper
             const mobileHelper = document.createElement('div');
             mobileHelper.className = 'mobile-nav-helper';
-            mobileHelper.innerHTML = 'Drag blocks to move • Touch connectors to connect • Pinch to zoom • Two fingers to pan';
+            mobileHelper.innerHTML = 'Drag blocks to move • Touch connectors to connect • Two fingers to pan workspace';
             mobileHelper.style.cssText = `
                 position: fixed;
                 top: 70px;
@@ -1300,9 +1327,10 @@ document.addEventListener('DOMContentLoaded', () => {
             // Setup touch event handlers
             setupTouchEvents();
             
-            // Modify workspace for mobile
+            // Modify workspace for mobile - CRITICAL: Disable all touch behaviors
             workspace.style.touchAction = 'none';
             workspace.style.overflow = 'hidden';
+            workspace.style.overscrollBehavior = 'none'; // Prevent overscroll bounce
             
             // Add mobile-specific CSS class
             document.body.classList.add('mobile-device');
@@ -1311,7 +1339,20 @@ document.addEventListener('DOMContentLoaded', () => {
             const elements = document.querySelectorAll('#workspace, .script-block, .connector');
             elements.forEach(el => {
                 el.style.touchAction = 'none';
+                el.style.userSelect = 'none'; // Prevent text selection
             });
+            
+            // Disable touch behaviors on the workspace container too
+            const workspaceContainer = document.getElementById('workspace-container');
+            if (workspaceContainer) {
+                workspaceContainer.style.touchAction = 'none';
+                workspaceContainer.style.overflow = 'hidden';
+                workspaceContainer.style.overscrollBehavior = 'none';
+            }
+            
+            // Disable body scrolling on mobile when touching workspace
+            document.body.style.overscrollBehavior = 'none';
+            document.body.style.touchAction = 'pan-x pan-y'; // Allow scrolling on other parts
         }
     }
 
@@ -1504,7 +1545,11 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (type === 'next') {
             textLabel.textContent = nextLabel || 'v';
         } else if (type === 'dataInput' || type === 'dataOutput') {
-            textLabel.textContent = name.substring(0, 2).toUpperCase();
+            if (name.length > 3) {
+                textLabel.textContent = name.substring(0, 2).toUpperCase();
+            } else {
+                textLabel.textContent = name.substring(0, 1).toUpperCase();
+            }
         } else {
             textLabel.textContent = name.substring(0, 1).toUpperCase();
         }
@@ -1515,70 +1560,74 @@ document.addEventListener('DOMContentLoaded', () => {
         let isConnecting = false;
         let startConnector = null;
         
-        // Mouse events
+        // Mouse events for desktop
         connector.addEventListener('mousedown', (e) => {
             e.preventDefault();
             e.stopPropagation();
             handleConnectorStart(connector, e.clientX, e.clientY);
         });
         
-        // Touch events with better handling
-        connector.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            
-            const touch = e.touches[0];
-            handleConnectorStart(connector, touch.clientX, touch.clientY);
-            
-            // Add visual feedback for touch
-            connector.style.transform = 'scale(1.2)';
-            connector.style.boxShadow = '0 0 15px rgba(99, 179, 237, 0.8)';
-        }, { passive: false });
-        
-        connector.addEventListener('touchmove', (e) => {
-            if (isConnecting) {
+        // Touch events for mobile - only if it's actually a touch device
+        if (isTouchDevice) {
+            connector.addEventListener('touchstart', (e) => {
                 e.preventDefault();
+                e.stopPropagation();
+                
                 const touch = e.touches[0];
+                handleConnectorStart(connector, touch.clientX, touch.clientY);
                 
-                // Update temp line if connecting
-                if (tempLine) {
-                    handleConnectorMove(touch.clientX, touch.clientY);
+                // Add visual feedback for touch
+                connector.style.transform = 'scale(1.2)';
+                connector.style.boxShadow = '0 0 15px rgba(99, 179, 237, 0.8)';
+            }, { passive: false });
+            
+            connector.addEventListener('touchmove', (e) => {
+                if (isConnecting) {
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    
+                    // Update temp line if connecting
+                    if (tempLine) {
+                        handleConnectorMove(touch.clientX, touch.clientY);
+                    }
+                    
+                    // Check for connector under touch
+                    const elementUnderTouch = document.elementFromPoint(touch.clientX, touch.clientY);
+                    const targetConnector = elementUnderTouch?.closest('.connector');
+                    
+                    if (targetConnector && targetConnector !== connector) {
+                        // Highlight potential target
+                        targetConnector.style.boxShadow = '0 0 15px rgba(104, 211, 145, 0.8)';
+                    }
                 }
+            }, { passive: false });
+            
+            connector.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
                 
-                // Check for connector under touch
-                const elementUnderTouch = document.elementFromPoint(touch.clientX, touch.clientY);
-                const targetConnector = elementUnderTouch?.closest('.connector');
+                // Remove visual feedback
+                connector.style.transform = '';
+                connector.style.boxShadow = '';
                 
-                if (targetConnector && targetConnector !== connector) {
-                    // Highlight potential target
-                    targetConnector.style.boxShadow = '0 0 15px rgba(104, 211, 145, 0.8)';
+                if (isConnecting) {
+                    const touch = e.changedTouches[0];
+                    const elementUnderTouch = document.elementFromPoint(touch.clientX, touch.clientY);
+                    const targetConnector = elementUnderTouch?.closest('.connector');
+                    
+                    if (targetConnector && targetConnector !== connector) {
+                        handleConnectorEnd(targetConnector);
+                    } else {
+                        // Cancel connection
+                        cleanupConnectionAttempt();
+                    }
+                    
+                    isConnecting = false;
+                    startConnector = null;
                 }
-            }
-        }, { passive: false });
-        
-        connector.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            
-            // Remove visual feedback
-            connector.style.transform = '';
-            connector.style.boxShadow = '';
-            
-            const touch = e.changedTouches[0];
-            const elementUnderTouch = document.elementFromPoint(touch.clientX, touch.clientY);
-            const targetConnector = elementUnderTouch?.closest('.connector');
-            
-            if (targetConnector && targetConnector !== connector) {
-                handleConnectorEnd(targetConnector);
-            } else {
-                // Cancel connection
-                cleanupConnectionAttempt();
-            }
-            
-            isConnecting = false;
-            startConnector = null;
-        }, { passive: false });
-        
+            }, { passive: false });
+        }
+
         function handleConnectorStart(connectorEl, clientX, clientY) {
             isConnecting = true;
             startConnector = connectorEl;
@@ -1619,7 +1668,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Attempt to create connection
                 const canConnect = validateConnection(startConnector, targetConnector);
                 if (canConnect) {
-                    createConnection(startConnector, targetConnector);
+                    // Create connection using the existing createConnection function
+                    const fromInfo = {
+                        blockId: startConnector.dataset.blockId,
+                        connectorElement: startConnector,
+                        connectorType: startConnector.dataset.connectorType,
+                        connectorName: startConnector.dataset.connectorName
+                    };
+                    
+                    const toInfo = {
+                        blockId: targetConnector.dataset.blockId,
+                        connectorElement: targetConnector,
+                        connectorType: targetConnector.dataset.connectorType,
+                        connectorName: targetConnector.dataset.connectorName
+                    };
+                    
+                    createConnection(fromInfo, toInfo);
+                    saveState();
                 }
             }
             cleanupConnectionAttempt();

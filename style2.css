@@ -135,95 +135,60 @@
         padding: 10px;
     }
     
-    /* Mobile Workspace - FIXED */
+    /* Mobile Workspace - FIXED to prevent all scrolling */
     #workspace {
-        touch-action: none; /* Disable all default touch behaviors */
-        overflow: hidden; /* Prevent scrolling */
+        touch-action: none !important; /* Disable all default touch behaviors */
+        overflow: hidden !important; /* Prevent scrolling */
+        overscroll-behavior: none !important; /* Prevent bounce */
         min-width: 100%;
         min-height: 100%;
         background-size: 15px 15px;
         position: relative;
+        user-select: none; /* Prevent text selection */
+        -webkit-user-select: none;
+        -webkit-touch-callout: none !important; /* Prevent iOS callout menu */
+    }
+    
+    /* Ensure workspace container doesn't scroll */
+    #workspace-container {
+        overflow: hidden !important;
+        touch-action: none !important;
+        overscroll-behavior: none !important;
     }
     
     /* Mobile Script Blocks - Better touch handling */
     .script-block {
-        min-width: 160px; /* Increased from 140px */
-        padding: 10px; /* Increased padding */
-        font-size: 0.85rem; /* Slightly larger font */
-        touch-action: none; /* Disable default touch behaviors */
-        user-select: none; /* Prevent text selection */
-    }
-    
-    .script-block-header {
+        min-width: 160px;
+        padding: 10px;
         font-size: 0.85rem;
-    }
-    
-    .script-block-content input,
-    .script-block-content textarea,
-    .script-block-content select {
-        font-size: 0.8rem;
-        padding: 4px;
+        touch-action: none !important; /* Disable default touch behaviors */
+        user-select: none !important; /* Prevent text selection */
+        -webkit-user-select: none !important;
+        -webkit-touch-callout: none !important;
     }
     
     /* Mobile Connectors - Larger touch targets */
     .connector {
-        width: 32px; /* Increased from 24px */
+        width: 32px;
         height: 32px;
-        touch-action: none;
+        touch-action: none !important;
         cursor: pointer;
+        user-select: none !important;
+        -webkit-user-select: none !important;
     }
     
-    .connector-text {
-        font-size: 10px; /* Slightly larger */
-        font-weight: bold;
+    /* Allow touch interaction only on input elements */
+    .script-block-content input,
+    .script-block-content textarea,
+    .script-block-content select {
+        touch-action: manipulation !important; /* Allow normal input interaction */
+        user-select: text !important; /* Allow text selection in inputs */
+        -webkit-user-select: text !important;
     }
     
-    /* Mobile Workspace Controls */
-    .workspace-controls {
-        bottom: 10px;
-        right: 10px;
-        padding: 6px;
-        gap: 6px;
-        flex-wrap: wrap;
-        max-width: 200px;
-    }
-    
-    .workspace-controls button {
-        width: 35px;
-        height: 35px;
-        font-size: 16px;
-    }
-    
-    /* Mobile Console Panel */
-    .console-panel {
-        left: 0;
-        right: 0;
-        height: 150px;
-    }
-    
-    .console-panel.collapsed {
-        height: 25px;
-    }
-    
-    .console-header {
-        height: 25px;
-        padding: 3px 8px;
-    }
-    
-    .console-title {
-        font-size: 0.9rem;
-    }
-    
-    /* Mobile Modal adjustments */
-    .scriptflow-modal {
-        width: 95% !important;
-        height: 95% !important;
-        margin: 10px;
-    }
-    
-    /* Hide delete buttons on mobile to prevent accidental deletion */
-    .delete-block {
-        display: none;
+    /* Prevent zoom on input focus */
+    input, textarea, select {
+        font-size: 16px !important; /* Prevent iOS zoom on focus */
     }
 }
 
