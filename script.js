@@ -729,13 +729,40 @@ document.addEventListener('DOMContentLoaded', () => {
         let touchStarted = false;
         let initialDistance = 0;
         let initialScale = 1;
+        let isDraggingBlock = false;
+        let touchTarget = null;
         
         // Touch start
         workspace.addEventListener('touchstart', (e) => {
             touchStarted = true;
             touchStartTime = Date.now();
+            touchTarget = e.target;
             
-            if (e.touches.length === 1) {
+            // Check if touching a block or connector
+            const block = e.target.closest('.script-block');
+            const connector = e.target.closest('.connector');
+            
+            if (connector) {
+                // Handle connector touch - convert to mouse events
+                const touch = e.touches[0];
+                const mouseEvent = new MouseEvent('mousedown', {
+                    clientX: touch.clientX,
+                    clientY: touch.clientY,
+                    button: 0,
+                    bubbles: true
+                });
+                connector.dispatchEvent(mouseEvent);
+                e.preventDefault();
+                return;
+            }
+            
+            if (block && !e.target.matches('input, textarea, select, button')) {
+                isDraggingBlock = true;
+                // Enable block dragging by preventing workspace pan
+                e.stopPropagation();
+            }
+            
+            if (e.touches.length === 1 && !isDraggingBlock) {
                 touchStartX = e.touches[0].clientX;
                 touchStartY = e.touches[0].clientY;
             } else if (e.touches.length === 2) {
@@ -755,8 +782,14 @@ document.addEventListener('DOMContentLoaded', () => {
         workspace.addEventListener('touchmove', (e) => {
             if (!touchStarted) return;
             
-            if (e.touches.length === 1 && isPanning) {
-                // Single finger pan
+            // Check if we're dragging a block
+            if (isDraggingBlock) {
+                // Let the block's touch handling take over
+                return;
+            }
+            
+            if (e.touches.length === 1 && isPanning && !isDraggingBlock) {
+                // Single finger pan - only if not dragging a block
                 const deltaX = (e.touches[0].clientX - touchStartX) / scale;
                 const deltaY = (e.touches[0].clientY - touchStartY) / scale;
                 
@@ -796,9 +829,23 @@ document.addEventListener('DOMContentLoaded', () => {
             if (touchStarted) {
                 const touchDuration = Date.now() - touchStartTime;
                 
+                // Handle connector touch end
+                if (touchTarget && touchTarget.closest('.connector')) {
+                    const touch = e.changedTouches[0];
+                    const mouseEvent = new MouseEvent('mouseup', {
+                        clientX: touch.clientX,
+                        clientY: touch.clientY,
+                        button: 0,
+                        bubbles: true
+                    });
+                    document.dispatchEvent(mouseEvent);
+                }
+                
                 if (e.touches.length === 0) {
                     isPanning = false;
                     touchStarted = false;
+                    isDraggingBlock = false;
+                    touchTarget = null;
                     
                     // Save state after touch interaction
                     if (touchDuration > 100) {
@@ -813,7 +860,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 lastTouchEnd = now;
             }
-        });
+        }, { passive: false });
         
         // Prevent context menu on long press
         workspace.addEventListener('contextmenu', (e) => {
@@ -1225,28 +1272,52 @@ document.addEventListener('DOMContentLoaded', () => {
             // Add mobile navigation helper
             const mobileHelper = document.createElement('div');
             mobileHelper.className = 'mobile-nav-helper';
-            mobileHelper.innerHTML = 'Pinch to zoom • Two-finger pan • Tap to select';
+            mobileHelper.innerHTML = 'Drag blocks to move • Touch connectors to connect • Pinch to zoom • Two fingers to pan';
+            mobileHelper.style.cssText = `
+                position: fixed;
+                top: 70px;
+                left: 10px;
+                right: 10px;
+                background-color: rgba(26, 32, 44, 0.95);
+                color: #e2e8f0;
+                padding: 12px 16px;
+                border-radius: 8px;
+                font-size: 0.85rem;
+                z-index: 1000;
+                text-align: center;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                border: 1px solid #4a5568;
+                transition: opacity 0.5s ease;
+            `;
             document.body.appendChild(mobileHelper);
             
-            // Hide helper after 5 seconds
+            // Hide helper after 8 seconds
             setTimeout(() => {
                 mobileHelper.style.opacity = '0';
                 setTimeout(() => mobileHelper.remove(), 500);
-            }, 5000);
+            }, 8000);
             
             // Setup touch event handlers
             setupTouchEvents();
             
             // Modify workspace for mobile
-            workspace.style.touchAction = 'manipulation';
+            workspace.style.touchAction = 'none';
+            workspace.style.overflow = 'hidden';
             
             // Add mobile-specific CSS class
             document.body.classList.add('mobile-device');
+            
+            // Disable default touch behaviors on key elements
+            const elements = document.querySelectorAll('#workspace, .script-block, .connector');
+            elements.forEach(el => {
+                el.style.touchAction = 'none';
+            });
         }
     }
 
     // Define makeDraggable function before it's used in createBlock
     function makeDraggable(element) {
+        // Mouse events for desktop
         element.addEventListener('mousedown', (e) => {
             // Ignore if clicked on input, textarea, select, connector, delete button, or using Ctrl
             if (e.target.tagName === 'INPUT' || 
@@ -1284,6 +1355,92 @@ document.addEventListener('DOMContentLoaded', () => {
             document.addEventListener('mousemove', onMouseMove);
             document.addEventListener('mouseup', onMouseUpDraggable);
         });
+        
+        // Touch events for mobile
+        let touchStartPos = null;
+        let touchOffsetX = 0;
+        let touchOffsetY = 0;
+        
+        element.addEventListener('touchstart', (e) => {
+            // Ignore if touched on input, textarea, select, connector, delete button
+            if (e.target.tagName === 'INPUT' || 
+                e.target.tagName === 'TEXTAREA' || 
+                e.target.tagName === 'SELECT' ||
+                e.target.classList.contains('connector') || 
+                e.target.classList.contains('delete-block')) {
+                return;
+            }
+            
+            e.preventDefault();
+            e.stopPropagation(); // Prevent workspace pan
+            
+            const touch = e.touches[0];
+            const workspaceRect = workspace.getBoundingClientRect();
+            
+            // Store current block position in workspace coordinates
+            const blockX = parseFloat(element.style.left) || 0;
+            const blockY = parseFloat(element.style.top) || 0;
+            
+            // Calculate touch position in workspace coordinates
+            const touchWorkspaceX = (touch.clientX - workspaceRect.left) / scale;
+            const touchWorkspaceY = (touch.clientY - workspaceRect.top) / scale;
+            
+            // Calculate offset
+            touchOffsetX = touchWorkspaceX - blockX;
+            touchOffsetY = touchWorkspaceY - blockY;
+            
+            touchStartPos = { x: touch.clientX, y: touch.clientY };
+            
+            // Add visual feedback
+            element.style.opacity = '0.8';
+            element.style.zIndex = '1000';
+        }, { passive: false });
+        
+        element.addEventListener('touchmove', (e) => {
+            if (!touchStartPos) return;
+            
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const touch = e.touches[0];
+            const workspaceRect = workspace.getBoundingClientRect();
+            
+            // Calculate new position in workspace coordinates
+            const touchWorkspaceX = (touch.clientX - workspaceRect.left) / scale;
+            const touchWorkspaceY = (touch.clientY - workspaceRect.top) / scale;
+            
+            // Apply new position by subtracting the offset
+            const newX = touchWorkspaceX - touchOffsetX;
+            const newY = touchWorkspaceY - touchOffsetY;
+            
+            // Apply the new position
+            element.style.left = `${newX}px`;
+            element.style.top = `${newY}px`;
+            
+            // Check if we need to expand the workspace
+            ensureWorkspaceSize(newX, newY);
+            
+            // Update connection lines during dragging
+            updateAllConnectionLines();
+        }, { passive: false });
+        
+        element.addEventListener('touchend', (e) => {
+            if (!touchStartPos) return;
+            
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // Remove visual feedback
+            element.style.opacity = '';
+            element.style.zIndex = '';
+            
+            touchStartPos = null;
+            touchOffsetX = 0;
+            touchOffsetY = 0;
+            
+            // Save state
+            saveState();
+        }, { passive: false });
     }
 
     function onMouseMove(e) {
@@ -1330,49 +1487,187 @@ document.addEventListener('DOMContentLoaded', () => {
         connector.dataset.blockId = blockId;
         connector.dataset.connectorType = type;
         connector.dataset.connectorName = name;
-        connector.title = `${type}: ${name}`;
 
-        // Add standard events
-        connector.addEventListener('mousedown', handleConnectorMouseDown);
-        connector.addEventListener('mouseup', handleConnectorMouseUp);
+        // Add text label
+        const textLabel = document.createElement('span');
+        textLabel.className = 'connector-text';
         
-        // Add right-click handler for connectors
-        connector.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            rightClickedConnectorElement = connector;
-            showConnectorContextMenu(e.clientX, e.clientY);
-        });
-        
-        // Create text inside connector
-        let labelText = name;
-        
-        // Set appropriate label text
-        if (className.includes('child')) {
-            labelText = previousLabel;
-        } else if (className.includes('parent')) {
-            if (name === 'parent') {
-                labelText = 'Out';
-            } else if (name === 'branch' || name === 'body') {
-                labelText = bodyLabel;
-            }
-            else if (name === 'next') {
-                labelText = nextLabel; // Keep as 'Next' for sequential flow
-            }
-        } else if (className.includes('input')) {
-            // Keep the name or use a shorter version if needed
-            labelText = name.charAt(0).toUpperCase() + name.slice(1, 3);
-        } else if (className.includes('output')) {
-            // Keep the name or use a shorter version if needed
-            labelText = name.charAt(0).toUpperCase() + name.slice(1, 3);
+        // Set appropriate text based on connector type
+        if (type === 'flowIn') {
+            textLabel.textContent = previousLabel || '^';
+        } else if (type === 'flowOut') {
+            textLabel.textContent = nextLabel || 'v';
+        } else if (type === 'branch') {
+            textLabel.textContent = bodyLabel || '{--}';
+        } else if (type === 'elseBranch') {
+            textLabel.textContent = 'Else';
+        } else if (type === 'next') {
+            textLabel.textContent = nextLabel || 'v';
+        } else if (type === 'dataInput' || type === 'dataOutput') {
+            textLabel.textContent = name.substring(0, 2).toUpperCase();
+        } else {
+            textLabel.textContent = name.substring(0, 1).toUpperCase();
         }
         
-        // Set the text inside the connector
-        const textSpan = document.createElement('span');
-        textSpan.className = 'connector-text';
-        textSpan.textContent = labelText;
-        connector.appendChild(textSpan);
+        connector.appendChild(textLabel);
+
+        // Enhanced touch and mouse event handling
+        let isConnecting = false;
+        let startConnector = null;
         
+        // Mouse events
+        connector.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            handleConnectorStart(connector, e.clientX, e.clientY);
+        });
+        
+        // Touch events with better handling
+        connector.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const touch = e.touches[0];
+            handleConnectorStart(connector, touch.clientX, touch.clientY);
+            
+            // Add visual feedback for touch
+            connector.style.transform = 'scale(1.2)';
+            connector.style.boxShadow = '0 0 15px rgba(99, 179, 237, 0.8)';
+        }, { passive: false });
+        
+        connector.addEventListener('touchmove', (e) => {
+            if (isConnecting) {
+                e.preventDefault();
+                const touch = e.touches[0];
+                
+                // Update temp line if connecting
+                if (tempLine) {
+                    handleConnectorMove(touch.clientX, touch.clientY);
+                }
+                
+                // Check for connector under touch
+                const elementUnderTouch = document.elementFromPoint(touch.clientX, touch.clientY);
+                const targetConnector = elementUnderTouch?.closest('.connector');
+                
+                if (targetConnector && targetConnector !== connector) {
+                    // Highlight potential target
+                    targetConnector.style.boxShadow = '0 0 15px rgba(104, 211, 145, 0.8)';
+                }
+            }
+        }, { passive: false });
+        
+        connector.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // Remove visual feedback
+            connector.style.transform = '';
+            connector.style.boxShadow = '';
+            
+            const touch = e.changedTouches[0];
+            const elementUnderTouch = document.elementFromPoint(touch.clientX, touch.clientY);
+            const targetConnector = elementUnderTouch?.closest('.connector');
+            
+            if (targetConnector && targetConnector !== connector) {
+                handleConnectorEnd(targetConnector);
+            } else {
+                // Cancel connection
+                cleanupConnectionAttempt();
+            }
+            
+            isConnecting = false;
+            startConnector = null;
+        }, { passive: false });
+        
+        function handleConnectorStart(connectorEl, clientX, clientY) {
+            isConnecting = true;
+            startConnector = connectorEl;
+            
+            connectionStartInfo = {
+                blockId: connectorEl.dataset.blockId,
+                connectorElement: connectorEl,
+                connectorType: connectorEl.dataset.connectorType,
+                connectorName: connectorEl.dataset.connectorName,
+                isOutput: connectorEl.classList.contains('connector-output') || 
+                        connectorEl.classList.contains('connector-parent') ||
+                        connectorEl.classList.contains('connector-branch') ||
+                        connectorEl.classList.contains('connector-else-branch') ||
+                        connectorEl.classList.contains('connector-next')
+            };
+            
+            // Create temp line
+            const rect = connectorEl.getBoundingClientRect();
+            const workspaceRect = workspace.getBoundingClientRect();
+            const startX = rect.left + rect.width/2 - workspaceRect.left;
+            const startY = rect.top + rect.height/2 - workspaceRect.top;
+            
+            createTempLine(startX, startY, clientX - workspaceRect.left, clientY - workspaceRect.top);
+        }
+        
+        function handleConnectorMove(clientX, clientY) {
+            if (tempLine) {
+                const workspaceRect = workspace.getBoundingClientRect();
+                const endX = clientX - workspaceRect.left;
+                const endY = clientY - workspaceRect.top;
+                
+                updateTempLine(endX, endY);
+            }
+        }
+        
+        function handleConnectorEnd(targetConnector) {
+            if (startConnector && targetConnector && startConnector !== targetConnector) {
+                // Attempt to create connection
+                const canConnect = validateConnection(startConnector, targetConnector);
+                if (canConnect) {
+                    createConnection(startConnector, targetConnector);
+                }
+            }
+            cleanupConnectionAttempt();
+        }
+
         return connector;
+    }
+
+    // Add these helper functions for better touch support
+    function createTempLine(startX, startY, endX, endY) {
+        if (tempLine) {
+            svgLayer.removeChild(tempLine);
+        }
+        
+        tempLine = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        tempLine.setAttribute('class', 'temp-connection-line');
+        
+        const pathData = calculateBezierPath(startX, startY, endX, endY, 'horizontal', 'horizontal');
+        tempLine.setAttribute('d', pathData);
+        
+        svgLayer.appendChild(tempLine);
+    }
+
+    function updateTempLine(endX, endY) {
+        if (!tempLine || !connectionStartInfo) return;
+        
+        const connectorRect = connectionStartInfo.connectorElement.getBoundingClientRect();
+        const workspaceRect = workspace.getBoundingClientRect();
+        const startX = connectorRect.left + connectorRect.width/2 - workspaceRect.left;
+        const startY = connectorRect.top + connectorRect.height/2 - workspaceRect.top;
+        
+        const pathData = calculateBezierPath(startX, startY, endX, endY, 'horizontal', 'horizontal');
+        tempLine.setAttribute('d', pathData);
+    }
+
+    function validateConnection(fromConnector, toConnector) {
+        // Add your connection validation logic here
+        // Return true if connection is valid, false otherwise
+        const fromType = fromConnector.dataset.connectorType;
+        const toType = toConnector.dataset.connectorType;
+        const fromBlock = fromConnector.dataset.blockId;
+        const toBlock = toConnector.dataset.blockId;
+        
+        // Prevent self-connection
+        if (fromBlock === toBlock) return false;
+        
+        // Add more validation rules as needed
+        return true;
     }
 
     function createAndPositionTooltip(targetEl, step) {

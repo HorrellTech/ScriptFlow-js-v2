@@ -60,10 +60,10 @@
         font-size: 0.8rem;
     }
     
-    /* Mobile Block Palette */
+    /* Mobile Block Palette - Make wider to prevent text cropping */
     #block-palette {
         width: 100%;
-        height: 200px;
+        height: 220px; /* Increased height */
         padding: 10px;
         border-right: none;
         border-bottom: 1px solid #4a5568;
@@ -71,7 +71,7 @@
         overflow-y: hidden;
         display: flex;
         flex-direction: row;
-        gap: 10px;
+        gap: 12px; /* Increased gap */
     }
     
     #block-palette h2 {
@@ -79,7 +79,7 @@
     }
     
     .block-category {
-        min-width: 180px;
+        min-width: 200px; /* Increased from 180px */
         flex-shrink: 0;
         margin-bottom: 0;
     }
@@ -90,9 +90,12 @@
     }
     
     .palette-block {
-        font-size: 0.8rem;
-        padding: 8px 10px;
+        font-size: 0.85rem; /* Slightly larger font */
+        padding: 10px 12px; /* Increased padding */
         margin: 4px 2px;
+        white-space: nowrap; /* Prevent text wrapping */
+        overflow: visible; /* Show full text */
+        min-width: fit-content; /* Expand to fit content */
     }
     
     /* Mobile Workspace Container */
@@ -100,6 +103,8 @@
         flex: 1;
         position: relative;
         padding-bottom: 0;
+        overflow: hidden;
+        touch-action: none;
     }
     
     /* Mobile Code Output */
@@ -128,19 +133,23 @@
         padding: 10px;
     }
     
-    /* Mobile Workspace */
+    /* Mobile Workspace - FIXED */
     #workspace {
-        touch-action: pan-x pan-y pinch-zoom;
+        touch-action: none; /* Disable all default touch behaviors */
+        overflow: hidden; /* Prevent scrolling */
         min-width: 100%;
         min-height: 100%;
         background-size: 15px 15px;
+        position: relative;
     }
     
-    /* Mobile Script Blocks */
+    /* Mobile Script Blocks - Better touch handling */
     .script-block {
-        min-width: 140px;
-        padding: 8px;
-        font-size: 0.8rem;
+        min-width: 160px; /* Increased from 140px */
+        padding: 10px; /* Increased padding */
+        font-size: 0.85rem; /* Slightly larger font */
+        touch-action: none; /* Disable default touch behaviors */
+        user-select: none; /* Prevent text selection */
     }
     
     .script-block-header {
@@ -154,15 +163,17 @@
         padding: 4px;
     }
     
-    /* Mobile Connectors */
+    /* Mobile Connectors - Larger touch targets */
     .connector {
-        width: 24px;
-        height: 24px;
+        width: 32px; /* Increased from 24px */
+        height: 32px;
         touch-action: none;
+        cursor: pointer;
     }
     
     .connector-text {
-        font-size: 9px;
+        font-size: 10px; /* Slightly larger */
+        font-weight: bold;
     }
     
     /* Mobile Workspace Controls */
@@ -217,22 +228,26 @@
 /* Tablet adjustments */
 @media (min-width: 769px) and (max-width: 1024px) {
     #block-palette {
-        width: 200px;
+        width: 240px; /* Increased from 200px */
         padding: 12px;
     }
     
-    #code-output-container {
-        width: 300px;
-        padding: 12px;
+    .palette-block {
+        font-size: 0.9rem;
+        padding: 10px 12px;
+        white-space: nowrap;
+    }
+}
+
+/* Desktop - Also increase block palette width slightly */
+@media (min-width: 1025px) {
+    #block-palette {
+        width: 260px; /* Increased from 250px */
     }
     
-    .script-block {
-        min-width: 150px;
-    }
-    
-    .workspace-controls {
-        bottom: 15px;
-        right: 15px;
+    .palette-block {
+        white-space: nowrap;
+        overflow: visible;
     }
 }
 
