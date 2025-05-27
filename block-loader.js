@@ -21,6 +21,11 @@ window.BlockLoader = {
             name: 'CSS',
             file: 'blocks-css.js',
             loaded: false
+        },
+        'examples': {
+            name: 'Examples',
+            file: 'blocks-example.js',
+            loaded: false
         }
     },
 
@@ -145,11 +150,17 @@ window.BlockLoader = {
                     console.warn('CSS blocks not found');
                 }
                 break;
+            case 'examples':
+                if (window.EXAMPLE_BLOCK_DEFINITIONS) {
+                    window.BLOCK_DEFINITIONS = { ...window.EXAMPLE_BLOCK_DEFINITIONS };
+                } else {
+                    console.warn('Example blocks not found');
+                }
+                break;
             default:
                 console.warn(`Unknown block set: ${blockSetName}`);
         }
         
-        // Only refresh if we have block definitions
         // Only refresh if we have block definitions
         if (Object.keys(window.BLOCK_DEFINITIONS).length > 0) {
             // Refresh the block palette
@@ -195,6 +206,9 @@ window.BlockLoader = {
                     break;
                 case 'css':
                     codeArea.placeholder = 'Generated CSS code will appear here...';
+                    break;
+                case 'examples':
+                    codeArea.placeholder = 'Generated example code will appear here...';
                     break;
                 default:
                     codeArea.placeholder = 'Generated code will appear here...';

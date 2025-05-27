@@ -1860,9 +1860,32 @@ document.addEventListener('DOMContentLoaded', () => {
             'HTML Forms': '#b45309',     // Orange-brown
             'HTML Media': '#dc2626',     // Red
             'HTML Tables': '#16a34a',    // Green
-            'Misc': '#6b7280'          // Gray
-
             
+            // CSS categories
+            'CSS Layout': '#059669',     // Emerald
+            'CSS Styling': '#7c2d12',    // Red-brown
+            'CSS Typography': '#1e40af', // Blue
+            'CSS Colors': '#be185d',     // Pink
+            'CSS Effects': '#7c3aed',    // Purple
+            'CSS Animation': '#dc2626',  // Red
+            'CSS Responsive': '#0891b2', // Cyan
+            'CSS Grid': '#166534',       // Green
+            'CSS Flexbox': '#0369a1',    // Sky blue
+
+            // Example categories
+            'Flow Control Examples': '#f97316', // Orange (similar to Flow Control)
+            'Logic Examples': '#0ea5e9',        // Sky blue (similar to Logic)
+            'Data Examples': '#8b5cf6',         // Violet (similar to Variables/Data)
+            'Loop Examples': '#dc2626',         // Red
+            'I/O Examples': '#84cc16',          // Lime (similar to Input/Output)
+            'Function Examples': '#6366f1',     // Indigo (similar to Functions)
+            'Error Examples': '#ef4444',        // Red
+            'Advanced Examples': '#6366f1',     // Indigo
+            'Utility Examples': '#6b7280',      // Gray
+            'Value Examples': '#84cc16',        // Lime
+
+            // General/Fallback
+            'Misc': '#6b7280'          // Gray
         };
         
         // Group blocks by category
