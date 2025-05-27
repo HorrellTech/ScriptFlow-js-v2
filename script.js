@@ -1556,19 +1556,15 @@ document.addEventListener('DOMContentLoaded', () => {
         
         connector.appendChild(textLabel);
 
-        // Enhanced touch and mouse event handling
-        let isConnecting = false;
-        let startConnector = null;
-        
-        // Mouse events for desktop
-        connector.addEventListener('mousedown', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            handleConnectorStart(connector, e.clientX, e.clientY);
-        });
-        
-        // Touch events for mobile - only if it's actually a touch device
+        // Add mouse event handlers for desktop (ALWAYS add these)
+        connector.addEventListener('mousedown', handleConnectorMouseDown);
+        connector.addEventListener('mouseup', handleConnectorMouseUp);
+
+        // Add touch events only for touch devices
         if (isTouchDevice) {
+            let isConnecting = false;
+            let startConnector = null;
+            
             connector.addEventListener('touchstart', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -1626,68 +1622,68 @@ document.addEventListener('DOMContentLoaded', () => {
                     startConnector = null;
                 }
             }, { passive: false });
-        }
 
-        function handleConnectorStart(connectorEl, clientX, clientY) {
-            isConnecting = true;
-            startConnector = connectorEl;
-            
-            connectionStartInfo = {
-                blockId: connectorEl.dataset.blockId,
-                connectorElement: connectorEl,
-                connectorType: connectorEl.dataset.connectorType,
-                connectorName: connectorEl.dataset.connectorName,
-                isOutput: connectorEl.classList.contains('connector-output') || 
-                        connectorEl.classList.contains('connector-parent') ||
-                        connectorEl.classList.contains('connector-branch') ||
-                        connectorEl.classList.contains('connector-else-branch') ||
-                        connectorEl.classList.contains('connector-next')
-            };
-            
-            // Create temp line
-            const rect = connectorEl.getBoundingClientRect();
-            const workspaceRect = workspace.getBoundingClientRect();
-            const startX = rect.left + rect.width/2 - workspaceRect.left;
-            const startY = rect.top + rect.height/2 - workspaceRect.top;
-            
-            createTempLine(startX, startY, clientX - workspaceRect.left, clientY - workspaceRect.top);
-        }
-        
-        function handleConnectorMove(clientX, clientY) {
-            if (tempLine) {
-                const workspaceRect = workspace.getBoundingClientRect();
-                const endX = clientX - workspaceRect.left;
-                const endY = clientY - workspaceRect.top;
+            function handleConnectorStart(connectorEl, clientX, clientY) {
+                isConnecting = true;
+                startConnector = connectorEl;
                 
-                updateTempLine(endX, endY);
+                connectionStartInfo = {
+                    blockId: connectorEl.dataset.blockId,
+                    connectorElement: connectorEl,
+                    connectorType: connectorEl.dataset.connectorType,
+                    connectorName: connectorEl.dataset.connectorName,
+                    isOutput: connectorEl.classList.contains('connector-output') || 
+                            connectorEl.classList.contains('connector-parent') ||
+                            connectorEl.classList.contains('connector-branch') ||
+                            connectorEl.classList.contains('connector-else-branch') ||
+                            connectorEl.classList.contains('connector-next')
+                };
+                
+                // Create temp line
+                const rect = connectorEl.getBoundingClientRect();
+                const workspaceRect = workspace.getBoundingClientRect();
+                const startX = rect.left + rect.width/2 - workspaceRect.left;
+                const startY = rect.top + rect.height/2 - workspaceRect.top;
+                
+                createTempLine(startX, startY, clientX - workspaceRect.left, clientY - workspaceRect.top);
             }
-        }
-        
-        function handleConnectorEnd(targetConnector) {
-            if (startConnector && targetConnector && startConnector !== targetConnector) {
-                // Attempt to create connection
-                const canConnect = validateConnection(startConnector, targetConnector);
-                if (canConnect) {
-                    // Create connection using the existing createConnection function
-                    const fromInfo = {
-                        blockId: startConnector.dataset.blockId,
-                        connectorElement: startConnector,
-                        connectorType: startConnector.dataset.connectorType,
-                        connectorName: startConnector.dataset.connectorName
-                    };
+            
+            function handleConnectorMove(clientX, clientY) {
+                if (tempLine) {
+                    const workspaceRect = workspace.getBoundingClientRect();
+                    const endX = clientX - workspaceRect.left;
+                    const endY = clientY - workspaceRect.top;
                     
-                    const toInfo = {
-                        blockId: targetConnector.dataset.blockId,
-                        connectorElement: targetConnector,
-                        connectorType: targetConnector.dataset.connectorType,
-                        connectorName: targetConnector.dataset.connectorName
-                    };
-                    
-                    createConnection(fromInfo, toInfo);
-                    saveState();
+                    updateTempLine(endX, endY);
                 }
             }
-            cleanupConnectionAttempt();
+            
+            function handleConnectorEnd(targetConnector) {
+                if (startConnector && targetConnector && startConnector !== targetConnector) {
+                    // Attempt to create connection
+                    const canConnect = validateConnection(startConnector, targetConnector);
+                    if (canConnect) {
+                        // Create connection using the existing createConnection function
+                        const fromInfo = {
+                            blockId: startConnector.dataset.blockId,
+                            connectorElement: startConnector,
+                            connectorType: startConnector.dataset.connectorType,
+                            connectorName: startConnector.dataset.connectorName
+                        };
+                        
+                        const toInfo = {
+                            blockId: targetConnector.dataset.blockId,
+                            connectorElement: targetConnector,
+                            connectorType: targetConnector.dataset.connectorType,
+                            connectorName: targetConnector.dataset.connectorName
+                        };
+                        
+                        createConnection(fromInfo, toInfo);
+                        saveState();
+                    }
+                }
+                cleanupConnectionAttempt();
+            }
         }
 
         return connector;
