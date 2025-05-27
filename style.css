@@ -32,16 +32,23 @@ body {
 }
 
 .palette-block {
-    background-color: #2d3748; /* Dark block background */
-    border: 1px solid #4a5568; /* Darker border */
+    background-color: #2d3748; /* Base background */
     color: #e2e8f0; /* Light text */
-    padding: 10px;
-    margin-bottom: 10px;
+    padding: 12px 14px; /* Increased padding */
+    margin: 6px 3px;
     cursor: grab;
-    text-align: center;
     border-radius: 5px;
-    font-size: 0.95em;
-    transition: background-color 0.2s;
+    font-size: 0.9em;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: visible; /* Changed from hidden to allow text wrapping */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    display: flex;
+    align-items: center;
+    white-space: normal; /* Allow text wrapping */
+    word-wrap: break-word; /* Break long words if needed */
+    line-height: 1.3; /* Better line spacing for wrapped text */
+    min-height: 20px; /* Minimum height to accommodate single line */
 }
 
 .palette-block:hover {
@@ -644,7 +651,7 @@ body {
 
 /* Modern Block Palette Styling */
 #block-palette {
-    width: 250px; /* Slightly wider */
+    width: 280px; /* Increased from 250px */
     background-color: #1a202c; /* Darker palette background */
     padding: 15px;
     overflow-y: auto;
