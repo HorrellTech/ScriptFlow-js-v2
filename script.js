@@ -731,6 +731,9 @@ document.addEventListener('DOMContentLoaded', () => {
         let touchTarget = null;
         let twoFingerPanning = false;
         let lastTwoFingerCenter = null;
+        let initialPinchDistance = 0;
+        let initialScale = 1;
+        let isPinching = false;
         
         // Touch start
         workspace.addEventListener('touchstart', (e) => {
@@ -767,18 +770,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 touchStartX = e.touches[0].clientX;
                 touchStartY = e.touches[0].clientY;
                 twoFingerPanning = false;
+                isPinching = false;
                 e.preventDefault(); // Prevent scrolling
             } else if (e.touches.length === 2) {
-                // Two fingers - start panning mode
+                // Two fingers - start panning/pinching mode
                 twoFingerPanning = true;
+                isPinching = true;
                 const touch1 = e.touches[0];
                 const touch2 = e.touches[1];
                 
-                // Calculate center point of two fingers
+                // Calculate center point and initial distance for pinch-to-zoom
                 lastTwoFingerCenter = {
                     x: (touch1.clientX + touch2.clientX) / 2,
                     y: (touch1.clientY + touch2.clientY) / 2
                 };
+                
+                // Calculate initial pinch distance
+                const dx = touch1.clientX - touch2.clientX;
+                const dy = touch1.clientY - touch2.clientY;
+                initialPinchDistance = Math.sqrt(dx * dx + dy * dy);
+                initialScale = scale;
                 
                 e.preventDefault(); // Prevent any default behavior
             }
@@ -792,13 +803,12 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             
             // Check if we're dragging a block
-            if (isDraggingBlock) {
+            if (isDraggingBlock && e.touches.length === 1) {
                 // Let the block's touch handling take over
                 return;
             }
             
-            if (e.touches.length === 2 && twoFingerPanning) {
-                // Two finger panning
+            if (e.touches.length === 2 && (twoFingerPanning || isPinching)) {
                 const touch1 = e.touches[0];
                 const touch2 = e.touches[1];
                 
@@ -808,7 +818,24 @@ document.addEventListener('DOMContentLoaded', () => {
                     y: (touch1.clientY + touch2.clientY) / 2
                 };
                 
-                if (lastTwoFingerCenter) {
+                // Calculate new pinch distance for zoom
+                const dx = touch1.clientX - touch2.clientX;
+                const dy = touch1.clientY - touch2.clientY;
+                const newPinchDistance = Math.sqrt(dx * dx + dy * dy);
+                
+                // Handle pinch-to-zoom
+                if (isPinching && Math.abs(newPinchDistance - initialPinchDistance) > 10) {
+                    const scaleChange = newPinchDistance / initialPinchDistance;
+                    const newScale = Math.max(0.1, Math.min(5, initialScale * scaleChange));
+                    
+                    if (newScale !== scale) {
+                        scale = newScale;
+                        applyZoomOnly();
+                    }
+                }
+                
+                // Handle panning (only if not primarily pinching)
+                if (lastTwoFingerCenter && Math.abs(newPinchDistance - initialPinchDistance) < 50) {
                     // Calculate movement delta
                     const deltaX = (newCenter.x - lastTwoFingerCenter.x) / scale;
                     const deltaY = (newCenter.y - lastTwoFingerCenter.y) / scale;
@@ -851,22 +878,32 @@ document.addEventListener('DOMContentLoaded', () => {
                     document.dispatchEvent(mouseEvent);
                 }
                 
+                // Handle connection line touch for deletion
+                if (touchTarget && touchTarget.classList.contains('connection-line') && touchDuration > 500) {
+                    // Long press on connection line - show delete option
+                    showMobileConnectionMenu(e.changedTouches[0].clientX, e.changedTouches[0].clientY, touchTarget);
+                }
+                
                 if (e.touches.length === 0) {
                     // All fingers lifted
                     touchStarted = false;
                     isDraggingBlock = false;
                     twoFingerPanning = false;
+                    isPinching = false;
                     lastTwoFingerCenter = null;
                     touchTarget = null;
+                    initialPinchDistance = 0;
                     
                     // Save state after touch interaction
                     if (touchDuration > 100) {
                         saveState();
                     }
-                } else if (e.touches.length === 1 && twoFingerPanning) {
-                    // Went from 2 fingers to 1 finger - stop panning
+                } else if (e.touches.length === 1 && (twoFingerPanning || isPinching)) {
+                    // Went from 2 fingers to 1 finger - stop panning/pinching
                     twoFingerPanning = false;
+                    isPinching = false;
                     lastTwoFingerCenter = null;
+                    initialPinchDistance = 0;
                 }
                 
                 // Prevent double-tap zoom and other default behaviors
@@ -892,9 +929,185 @@ document.addEventListener('DOMContentLoaded', () => {
             touchStarted = false;
             isDraggingBlock = false;
             twoFingerPanning = false;
+            isPinching = false;
             lastTwoFingerCenter = null;
             touchTarget = null;
+            initialPinchDistance = 0;
         }, { passive: false });
+    }
+
+    function showMobileConnectionMenu(x, y, connectionElement) {
+        // Find the connection ID from the element
+        const connectionId = findConnectionIdFromElement(connectionElement);
+        if (!connectionId) return;
+        
+        // Create mobile menu
+        const menu = document.createElement('div');
+        menu.className = 'mobile-connection-menu';
+        menu.style.cssText = `
+            position: fixed;
+            left: ${x - 50}px;
+            top: ${y - 30}px;
+            background: #1a202c;
+            border: 2px solid #4299e1;
+            border-radius: 8px;
+            padding: 10px;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        `;
+        
+        const deleteBtn = document.createElement('button');
+        deleteBtn.textContent = 'Delete Connection';
+        deleteBtn.style.cssText = `
+            background: #e53e3e;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        `;
+        
+        deleteBtn.addEventListener('click', () => {
+            removeConnection(connectionId);
+            document.body.removeChild(menu);
+            saveState();
+        });
+        
+        menu.appendChild(deleteBtn);
+        document.body.appendChild(menu);
+        
+        // Remove menu after 3 seconds or on touch elsewhere
+        setTimeout(() => {
+            if (menu.parentNode) {
+                document.body.removeChild(menu);
+            }
+        }, 3000);
+        
+        document.addEventListener('touchstart', function removeMenuOnTouch(e) {
+            if (!menu.contains(e.target)) {
+                if (menu.parentNode) {
+                    document.body.removeChild(menu);
+                }
+                document.removeEventListener('touchstart', removeMenuOnTouch);
+            }
+        });
+    }
+
+    // Helper function to find connection ID from SVG element
+    function findConnectionIdFromElement(element) {
+        // Check if the element has an ID that matches our connection pattern
+        if (element.id && element.id.startsWith('path-conn-')) {
+            return element.id.replace('path-', '');
+        }
+        
+        // Otherwise, search through connections array to find matching element
+        for (const conn of connections) {
+            if (conn.pathElement === element || conn.dotElement === element) {
+                return conn.id;
+            }
+        }
+        
+        return null;
+    }
+
+    // Add collapsible panels for mobile
+    function setupMobilePanels() {
+        if (!isMobile && !isTouchDevice) return;
+        
+        // Make block palette collapsible
+        const blockPalette = document.getElementById('block-palette');
+        if (blockPalette) {
+            const paletteHeader = document.createElement('div');
+            paletteHeader.className = 'mobile-panel-header';
+            paletteHeader.innerHTML = '<span>Blocks</span><button class="mobile-toggle-btn">▼</button>';
+            
+            const paletteContent = document.createElement('div');
+            paletteContent.className = 'mobile-panel-content';
+            
+            // Move existing content to new content container
+            while (blockPalette.firstChild) {
+                paletteContent.appendChild(blockPalette.firstChild);
+            }
+            
+            blockPalette.appendChild(paletteHeader);
+            blockPalette.appendChild(paletteContent);
+            
+            // Add toggle functionality
+            paletteHeader.addEventListener('click', () => {
+                const isCollapsed = paletteContent.style.display === 'none';
+                paletteContent.style.display = isCollapsed ? 'flex' : 'none';
+                paletteHeader.querySelector('.mobile-toggle-btn').textContent = isCollapsed ? '▲' : '▼';
+            });
+        }
+        
+        // Make code output collapsible
+        const codeOutput = document.getElementById('code-output-container');
+        if (codeOutput) {
+            const outputHeader = document.createElement('div');
+            outputHeader.className = 'mobile-panel-header';
+            outputHeader.innerHTML = '<span>Generated Code</span><button class="mobile-toggle-btn">▼</button>';
+            
+            const outputContent = document.createElement('div');
+            outputContent.className = 'mobile-panel-content';
+            outputContent.style.flexDirection = 'column';
+            
+            // Move existing content to new content container
+            while (codeOutput.firstChild) {
+                outputContent.appendChild(codeOutput.firstChild);
+            }
+            
+            codeOutput.appendChild(outputHeader);
+            codeOutput.appendChild(outputContent);
+            
+            // Add toggle functionality
+            outputHeader.addEventListener('click', () => {
+                const isCollapsed = outputContent.style.display === 'none';
+                outputContent.style.display = isCollapsed ? 'flex' : 'none';
+                outputHeader.querySelector('.mobile-toggle-btn').textContent = isCollapsed ? '▲' : '▼';
+            });
+        }
+    }
+
+    // Add collapsible workspace controls
+    function setupCollapsibleControls() {
+        const controlsContainer = document.getElementById('workspace-controls');
+        if (!controlsContainer) return;
+        
+        // Create toggle button
+        const toggleBtn = document.createElement('button');
+        toggleBtn.className = 'controls-toggle-btn';
+        toggleBtn.innerHTML = '◀';
+        toggleBtn.title = 'Toggle Controls';
+        
+        // Create wrapper for existing controls
+        const controlsWrapper = document.createElement('div');
+        controlsWrapper.className = 'controls-wrapper';
+        
+        // Move existing controls to wrapper
+        while (controlsContainer.firstChild) {
+            controlsWrapper.appendChild(controlsContainer.firstChild);
+        }
+        
+        // Add toggle button and wrapper to container
+        controlsContainer.appendChild(toggleBtn);
+        controlsContainer.appendChild(controlsWrapper);
+        
+        // Set initial state (collapsed on mobile)
+        let isCollapsed = isMobile || isTouchDevice;
+        if (isCollapsed) {
+            controlsWrapper.style.display = 'none';
+            toggleBtn.innerHTML = '▶';
+            controlsContainer.classList.add('collapsed');
+        }
+        
+        // Add toggle functionality
+        toggleBtn.addEventListener('click', () => {
+            isCollapsed = !isCollapsed;
+            controlsWrapper.style.display = isCollapsed ? 'none' : 'flex';
+            toggleBtn.innerHTML = isCollapsed ? '▶' : '◀';
+            controlsContainer.classList.toggle('collapsed', isCollapsed);
+        });
     }
 
     function makeBlockCollapsible(blockElement, blockObject) {
@@ -1106,26 +1319,20 @@ document.addEventListener('DOMContentLoaded', () => {
     function getConnectorPosition(connectorElement) {
         if (!connectorElement) return { x: 0, y: 0 };
         
-        // Cache the workspace rect calculation to avoid repeated DOM queries
-        if (!window._workspaceRect || window._lastTransform !== workspace.style.transform) {
-            window._workspaceRect = workspace.getBoundingClientRect();
-            window._lastTransform = workspace.style.transform;
-        }
+        const rect = connectorElement.getBoundingClientRect();
+        const workspaceRect = workspace.getBoundingClientRect();
         
-        const rect = connectorElement.getBoundingClientRect(); // Connector's screen bounds
-        const workspaceRect = window._workspaceRect; // Use cached version
+        // Get the actual center of the connector element
+        const connectorCenterX = rect.left + rect.width / 2;
+        const connectorCenterY = rect.top + rect.height / 2;
         
-        // Center of the connector in screen coordinates
-        const connectorScreenX = rect.left + rect.width / 2;
-        const connectorScreenY = rect.top + rect.height / 2;
+        // Convert to workspace coordinates accounting for current transform
+        const relativeX = connectorCenterX - workspaceRect.left;
+        const relativeY = connectorCenterY - workspaceRect.top;
         
-        // Position of the connector relative to the transformed workspace's top-left corner on screen
-        const relativeScreenX = connectorScreenX - workspaceRect.left;
-        const relativeScreenY = connectorScreenY - workspaceRect.top;
-        
-        // Convert back to untransformed workspace (model) coordinates
-        const modelX = (relativeScreenX / scale) + panX;
-        const modelY = (relativeScreenY / scale) + panY;
+        // Account for workspace scaling and get position in model coordinates
+        const modelX = relativeX / scale;
+        const modelY = relativeY / scale;
         
         return { x: modelX, y: modelY };
     }
@@ -1299,7 +1506,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Add mobile navigation helper
             const mobileHelper = document.createElement('div');
             mobileHelper.className = 'mobile-nav-helper';
-            mobileHelper.innerHTML = 'Drag blocks to move • Touch connectors to connect • Two fingers to pan workspace';
+            mobileHelper.innerHTML = 'Drag blocks • Touch connectors to connect • Two fingers to pan/zoom • Long press connections to delete';
             mobileHelper.style.cssText = `
                 position: fixed;
                 top: 70px;
@@ -1318,19 +1525,25 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
             document.body.appendChild(mobileHelper);
             
-            // Hide helper after 8 seconds
+            // Hide helper after 10 seconds
             setTimeout(() => {
                 mobileHelper.style.opacity = '0';
                 setTimeout(() => mobileHelper.remove(), 500);
-            }, 8000);
+            }, 10000);
             
             // Setup touch event handlers
             setupTouchEvents();
             
+            // Setup mobile panels
+            setupMobilePanels();
+            
+            // Setup collapsible controls
+            setupCollapsibleControls();
+            
             // Modify workspace for mobile - CRITICAL: Disable all touch behaviors
             workspace.style.touchAction = 'none';
             workspace.style.overflow = 'hidden';
-            workspace.style.overscrollBehavior = 'none'; // Prevent overscroll bounce
+            workspace.style.overscrollBehavior = 'none';
             
             // Add mobile-specific CSS class
             document.body.classList.add('mobile-device');
@@ -1339,7 +1552,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const elements = document.querySelectorAll('#workspace, .script-block, .connector');
             elements.forEach(el => {
                 el.style.touchAction = 'none';
-                el.style.userSelect = 'none'; // Prevent text selection
+                el.style.userSelect = 'none';
             });
             
             // Disable touch behaviors on the workspace container too
@@ -1352,7 +1565,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Disable body scrolling on mobile when touching workspace
             document.body.style.overscrollBehavior = 'none';
-            document.body.style.touchAction = 'pan-x pan-y'; // Allow scrolling on other parts
+            document.body.style.touchAction = 'pan-x pan-y';
         }
     }
 
@@ -4142,6 +4355,9 @@ document.addEventListener('DOMContentLoaded', () => {
         controlsContainer.appendChild(zoomInBtn);
         
         document.getElementById('workspace-container').appendChild(controlsContainer);
+
+        // Setup collapsible controls after creating the container
+        setupCollapsibleControls();
         
         // Initial state save
         saveState();
