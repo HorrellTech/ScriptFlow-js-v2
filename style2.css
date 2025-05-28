@@ -1044,20 +1044,26 @@
     }
 }
 
-/* Fixed SVG layer positioning */
+/* Enhanced SVG layer positioning */
 #connection-layer {
     position: absolute !important;
     top: 0 !important;
     left: 0 !important;
     width: 100% !important;
     height: 100% !important;
-    pointer-events: none;
-    z-index: 10;
-    /* Transform will be set by JavaScript to match workspace */
+    pointer-events: none !important;
+    z-index: 10 !important;
+    transform: none !important; /* Always stay in viewport coordinates */
     transform-origin: 0 0 !important;
+    overflow: visible !important;
 }
 
 #connection-layer path,
 #connection-layer circle {
-    pointer-events: all;
+    pointer-events: all !important;
+}
+
+/* Ensure workspace container has relative positioning for SVG */
+#workspace-container {
+    position: relative !important;
 }

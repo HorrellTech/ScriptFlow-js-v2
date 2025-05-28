@@ -1385,18 +1385,18 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!connectorElement) return { x: 0, y: 0 };
         
         const rect = connectorElement.getBoundingClientRect();
-        const workspaceRect = workspace.getBoundingClientRect();
+        const workspaceContainer = document.getElementById('workspace-container');
+        const containerRect = workspaceContainer.getBoundingClientRect();
         
-        // Get the actual center of the connector element
+        // Get the actual center of the connector element in viewport coordinates
         const connectorCenterX = rect.left + rect.width / 2;
         const connectorCenterY = rect.top + rect.height / 2;
         
-        // Convert to workspace coordinates accounting for transform
-        // Since both workspace and SVG now have the same transform, we can use direct coordinates
-        const workspaceX = (connectorCenterX - workspaceRect.left) / scale;
-        const workspaceY = (connectorCenterY - workspaceRect.top) / scale;
+        // Convert to container-relative coordinates
+        const viewportX = connectorCenterX - containerRect.left;
+        const viewportY = connectorCenterY - containerRect.top;
         
-        return { x: workspaceX, y: workspaceY };
+        return { x: viewportX, y: viewportY };
     }
 
     function calculatePanBoundaries() {
@@ -4210,31 +4210,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Adjusted SVG layer size
     function adjustSvgLayerSize() {
-        // Get the workspace container dimensions
         const workspaceContainer = document.getElementById('workspace-container');
-        const containerRect = workspaceContainer.getBoundingClientRect();
         
-        // Make SVG layer cover the entire workspace container
+        // Make SVG layer match workspace exactly
         svgLayer.style.position = 'absolute';
         svgLayer.style.left = '0';
         svgLayer.style.top = '0';
         svgLayer.style.width = '100%';
         svgLayer.style.height = '100%';
         svgLayer.style.pointerEvents = 'none';
+        svgLayer.style.zIndex = '10';
         
-        // IMPORTANT: Don't reset transform here - let applyZoomOnly handle it
-        // svgLayer.style.transform = 'none'; // Remove this line
+        // Use the workspace container's dimensions for viewBox
+        const baseWidth = workspaceContainer.clientWidth;
+        const baseHeight = workspaceContainer.clientHeight;
         
-        // Set SVG attributes to match container size but scaled
-        const scaledWidth = containerRect.width / scale;
-        const scaledHeight = containerRect.height / scale;
+        // Update SVG viewBox to match workspace scale
+        const viewBoxWidth = baseWidth / scale;
+        const viewBoxHeight = baseHeight / scale;
         
-        svgLayer.setAttribute('width', scaledWidth);
-        svgLayer.setAttribute('height', scaledHeight);
-        svgLayer.setAttribute('viewBox', `0 0 ${scaledWidth} ${scaledHeight}`);
+        svgLayer.setAttribute('width', baseWidth);
+        svgLayer.setAttribute('height', baseHeight);
+        svgLayer.setAttribute('viewBox', `0 0 ${viewBoxWidth} ${viewBoxHeight}`);
         
-        // Force connection update after resize
-        updateAllConnectionLines();
+        // Enable pointer events on connections
+        const connections = svgLayer.querySelectorAll('path, circle');
+        connections.forEach(el => el.style.pointerEvents = 'all');
     }
 
     // Function to ensure workspace is big enough
@@ -4431,14 +4432,13 @@ document.addEventListener('DOMContentLoaded', () => {
         workspace.style.transform = matrix;
         workspace.style.transformOrigin = '0 0';
         
-        // CRITICAL FIX: Apply the SAME transform to SVG layer so they stay in sync
-        svgLayer.style.transform = matrix;
-        svgLayer.style.transformOrigin = '0 0';
-        
         // Update grid background to match scale
         workspace.style.backgroundSize = `${20 * scale}px ${20 * scale}px`;
         
-        // Update connection lines AFTER the transform has been applied
+        // Update SVG layer to match the workspace scale
+        adjustSvgLayerSize();
+        
+        // Update connection lines AFTER the transform and size adjustment
         requestAnimationFrame(() => {
             updateAllConnectionLines();
         });
