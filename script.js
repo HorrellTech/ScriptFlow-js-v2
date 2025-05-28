@@ -830,7 +830,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     
                     if (newScale !== scale) {
                         scale = newScale;
-                        applyZoomOnly();
+                        applyZoomOnly(); // This will now properly sync SVG layer
                     }
                 }
                 
@@ -1391,15 +1391,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const connectorCenterX = rect.left + rect.width / 2;
         const connectorCenterY = rect.top + rect.height / 2;
         
-        // Convert to workspace coordinates accounting for current transform
-        const relativeX = connectorCenterX - workspaceRect.left;
-        const relativeY = connectorCenterY - workspaceRect.top;
+        // Convert to workspace coordinates accounting for transform
+        // Since both workspace and SVG now have the same transform, we can use direct coordinates
+        const workspaceX = (connectorCenterX - workspaceRect.left) / scale;
+        const workspaceY = (connectorCenterY - workspaceRect.top) / scale;
         
-        // Account for workspace scaling and get position in model coordinates
-        const modelX = relativeX / scale;
-        const modelY = relativeY / scale;
-        
-        return { x: modelX, y: modelY };
+        return { x: workspaceX, y: workspaceY };
     }
 
     function calculatePanBoundaries() {
@@ -1837,9 +1834,10 @@ document.addEventListener('DOMContentLoaded', () => {
         
         connector.appendChild(textLabel);
 
-        // Add mouse event handlers for desktop (ALWAYS add these)
+        // Add mouse event handlers for desktop
         connector.addEventListener('mousedown', handleConnectorMouseDown);
         connector.addEventListener('mouseup', handleConnectorMouseUp);
+
 
         // Add touch events only for touch devices
         if (isTouchDevice) {
@@ -2977,7 +2975,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleConnectorMouseDown(e) {
         e.stopPropagation(); // Prevent block dragging
         isConnecting = true;
-        const connectorElement = e.currentTarget; // Use currentTarget to get the element with the event listener
+        const connectorElement = e.currentTarget;
         const blockId = connectorElement.dataset.blockId;
         const connectorType = connectorElement.dataset.connectorType;
         const connectorName = connectorElement.dataset.connectorName;
@@ -2987,62 +2985,56 @@ document.addEventListener('DOMContentLoaded', () => {
             connectorElement,
             connectorType,
             connectorName,
-            isOutput: connectorType === 'flowOut' || connectorType === 'dataOutput' // Determine if it's an output connector
+            isOutput: connectorType === 'flowOut' || connectorType === 'dataOutput'
         };
 
         const startPos = getConnectorPosition(connectorElement);
         
-        // Use path for tempLine to show curve preview
+        // Create temp line with proper positioning
         tempLine = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        tempLine.setAttribute('d', `M ${startPos.x} ${startPos.y} C ${startPos.x} ${startPos.y}, ${startPos.x} ${startPos.y}, ${startPos.x} ${startPos.y}`);
+        tempLine.setAttribute('d', `M ${startPos.x} ${startPos.y} L ${startPos.x} ${startPos.y}`);
         tempLine.setAttribute('class', 'connection-line temp-connection-line');
-        tempLine.setAttribute('stroke-dasharray', '5,5'); // Make the temp line dashed
+        tempLine.setAttribute('stroke', '#4299e1');
+        tempLine.setAttribute('stroke-width', '2');
+        tempLine.setAttribute('stroke-dasharray', '5,5');
+        tempLine.setAttribute('fill', 'none');
         svgLayer.appendChild(tempLine);
 
+        // Add global mouse move and up listeners
         document.addEventListener('mousemove', handleDocumentMouseMove);
-        document.addEventListener('mouseup', handleDocumentMouseUp, { once: true }); // Auto-remove after one fire
+        document.addEventListener('mouseup', handleDocumentMouseUp, { once: true });
     }
 
     function handleDocumentMouseMove(e) {
-        if (!isConnecting || !tempLine) return;
-        const workspaceRect = workspace.getBoundingClientRect();
+        if (!isConnecting || !tempLine || !connectionStartInfo) return;
         
-        // Calculate end position in SVG coordinates
-        const endX = (e.clientX - workspaceRect.left) / scale;
-        const endY = (e.clientY - workspaceRect.top) / scale;
+        // Get mouse position relative to SVG layer
+        const svgRect = svgLayer.getBoundingClientRect();
+        const endX = e.clientX - svgRect.left;
+        const endY = e.clientY - svgRect.top;
 
         const startPos = getConnectorPosition(connectionStartInfo.connectorElement);
-        const pathData = calculateBezierPath(
-            startPos.x, startPos.y, 
-            endX, endY, 
-            getComputedStyle(connectionStartInfo.connectorElement).getPropertyValue('--connector-direction').trim(),
-            'auto'
-        );
         
+        // Create a simple line for the temp connection (more responsive than bezier during drag)
+        const pathData = `M ${startPos.x} ${startPos.y} L ${endX} ${endY}`;
         tempLine.setAttribute('d', pathData);
-        
-        // Ensure workspace size is adequate
-        ensureWorkspaceSize(Math.max(startPos.x, endX), Math.max(startPos.y, endY));
     }
     
     function handleConnectorMouseUp(e) {
         e.stopPropagation();
         if (!isConnecting || !connectionStartInfo) return;
 
-        const endConnectorElement = e.currentTarget; // Use currentTarget to get the element with the event listener
+        const endConnectorElement = e.currentTarget;
         const endBlockId = endConnectorElement.dataset.blockId;
         const endConnectorType = endConnectorElement.dataset.connectorType;
         const endConnectorName = endConnectorElement.dataset.connectorName;
 
-        // Basic validation:
-        // 1. Not connecting to self
-        // 2. Connecting output to input (or vice-versa, depending on start)
-        // 3. Flow to Flow, Data to Data (more specific type checking later)
+        // Validate connection
         const isValidConnection = 
             connectionStartInfo.blockId !== endBlockId &&
             connectionStartInfo.isOutput !== (endConnectorType === 'flowOut' || endConnectorType === 'dataOutput') &&
-            ( (connectionStartInfo.connectorType.startsWith('flow') && endConnectorType.startsWith('flow')) ||
-              (connectionStartInfo.connectorType.startsWith('data') && endConnectorType.startsWith('data')) );
+            ((connectionStartInfo.connectorType.startsWith('flow') && endConnectorType.startsWith('flow')) ||
+             (connectionStartInfo.connectorType.startsWith('data') && endConnectorType.startsWith('data')));
 
         if (isValidConnection) {
             const fromInfo = connectionStartInfo.isOutput ? connectionStartInfo : { 
@@ -3058,11 +3050,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 connectorName: endConnectorName 
             } : connectionStartInfo;
             
-            // Check if target INPUT connector is already connected
-            // We now ALLOW multiple connections to an output
+            // Check for existing connections
             let canConnect = true;
             
-            // Check if this exact connection already exists
             const connectionExists = connections.some(conn => 
                 conn.fromBlockId === fromInfo.blockId && 
                 conn.fromConnectorType === fromInfo.connectorType && 
@@ -3087,40 +3077,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 if (existingInputConn) {
                     canConnect = false;
-                    console.warn("Target input connector already has a connection. Remove it first.");
+                    console.warn("Target input connector already has a connection.");
                 }
             }
 
             if (canConnect) {
                 createConnection(fromInfo, toInfo);
-                
-                // Save state after creating a connection
                 saveState();
-            } else {
-                console.warn("Connection rejected: Target connector already in use or duplicate connection.");
             }
-        } else {
-            console.warn("Invalid connection attempt.");
         }
         
         cleanupConnectionAttempt();
     }
 
-    function handleDocumentMouseUp(e) { // Called if mouseup occurs not on a connector
+    function handleDocumentMouseUp(e) {
         if (isConnecting) {
             cleanupConnectionAttempt();
         }
     }
 
     function cleanupConnectionAttempt() {
-        if (tempLine) {
-            svgLayer.removeChild(tempLine);
+        if (tempLine && tempLine.parentNode) {
+            tempLine.parentNode.removeChild(tempLine);
             tempLine = null;
         }
         isConnecting = false;
         connectionStartInfo = null;
         document.removeEventListener('mousemove', handleDocumentMouseMove);
-        // document.removeEventListener('mouseup', handleDocumentMouseUp); // Removed by {once: true} or explicitly if needed
+        // mouseup listener is removed automatically due to { once: true }
     }
 
     // Create SVG paths with event listeners
@@ -4226,18 +4210,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Adjusted SVG layer size
     function adjustSvgLayerSize() {
-        // Make SVG layer slightly larger than the workspace to accommodate panning
-        const width = Math.max(workspace.scrollWidth, workspace.clientWidth * 2);
-        const height = Math.max(workspace.scrollHeight, workspace.clientHeight * 2);
+        // Get the workspace container dimensions
+        const workspaceContainer = document.getElementById('workspace-container');
+        const containerRect = workspaceContainer.getBoundingClientRect();
         
-        // Set explicit sizes for the SVG layer
-        svgLayer.setAttribute('width', width);
-        svgLayer.setAttribute('height', height);
-        svgLayer.style.width = `${width}px`;
-        svgLayer.style.height = `${height}px`;
+        // Make SVG layer cover the entire workspace container
+        svgLayer.style.position = 'absolute';
+        svgLayer.style.left = '0';
+        svgLayer.style.top = '0';
+        svgLayer.style.width = '100%';
+        svgLayer.style.height = '100%';
+        svgLayer.style.pointerEvents = 'none';
         
-        // Set the viewBox to ensure SVG coordinates match workspace coordinates
-        svgLayer.setAttribute('viewBox', `0 0 ${width} ${height}`);
+        // IMPORTANT: Don't reset transform here - let applyZoomOnly handle it
+        // svgLayer.style.transform = 'none'; // Remove this line
+        
+        // Set SVG attributes to match container size but scaled
+        const scaledWidth = containerRect.width / scale;
+        const scaledHeight = containerRect.height / scale;
+        
+        svgLayer.setAttribute('width', scaledWidth);
+        svgLayer.setAttribute('height', scaledHeight);
+        svgLayer.setAttribute('viewBox', `0 0 ${scaledWidth} ${scaledHeight}`);
         
         // Force connection update after resize
         updateAllConnectionLines();
@@ -4318,9 +4312,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (isPanning) {
                 const dx = e.clientX - lastMouseX;
                 const dy = e.clientY - lastMouseY;
-                
-                // Get the current boundaries
-                const boundaries = calculatePanBoundaries();
                 
                 // Update the mouse position for next movement
                 lastMouseX = e.clientX;
@@ -4440,6 +4431,7 @@ document.addEventListener('DOMContentLoaded', () => {
         workspace.style.transform = matrix;
         workspace.style.transformOrigin = '0 0';
         
+        // CRITICAL FIX: Apply the SAME transform to SVG layer so they stay in sync
         svgLayer.style.transform = matrix;
         svgLayer.style.transformOrigin = '0 0';
         
@@ -4515,14 +4507,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const translateX = -panX * scale;
         const translateY = -panY * scale;
         
-        // Apply transform to both workspace and SVG layer
+        // Apply transform ONLY to workspace, not SVG layer
         const matrix = `matrix(${scale}, 0, 0, ${scale}, ${translateX}, ${translateY})`;
         
         workspace.style.transform = matrix;
         workspace.style.transformOrigin = '0 0';
         
-        svgLayer.style.transform = matrix;
-        svgLayer.style.transformOrigin = '0 0';
+        // DO NOT transform SVG layer - it stays in viewport coordinates
         
         // Fix: Calculate background position to match pan and scale
         workspace.style.backgroundPosition = `${-panX * scale % (20 * scale)}px ${-panY * scale % (20 * scale)}px`;
