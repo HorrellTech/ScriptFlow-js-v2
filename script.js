@@ -1024,6 +1024,8 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const paletteContent = document.createElement('div');
             paletteContent.className = 'mobile-panel-content';
+            paletteContent.style.display = 'block'; // Force block layout for palette
+            paletteContent.style.overflow = 'visible'; // Allow natural overflow
             
             // Move existing content to new content container
             while (blockPalette.firstChild) {
@@ -1036,7 +1038,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Add toggle functionality
             paletteHeader.addEventListener('click', () => {
                 const isCollapsed = paletteContent.style.display === 'none';
-                paletteContent.style.display = isCollapsed ? 'flex' : 'none';
+                paletteContent.style.display = isCollapsed ? 'block' : 'none'; // Use 'block' instead of 'flex'
                 paletteHeader.querySelector('.mobile-toggle-btn').textContent = isCollapsed ? '▲' : '▼';
             });
         }
@@ -1051,6 +1053,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const outputContent = document.createElement('div');
             outputContent.className = 'mobile-panel-content';
             outputContent.style.flexDirection = 'column';
+            outputContent.style.display = 'flex'; // Code output can use flex
             
             // Move existing content to new content container
             while (codeOutput.firstChild) {
@@ -1063,9 +1066,71 @@ document.addEventListener('DOMContentLoaded', () => {
             // Add toggle functionality
             outputHeader.addEventListener('click', () => {
                 const isCollapsed = outputContent.style.display === 'none';
-                outputContent.style.display = isCollapsed ? 'flex' : 'none';
+                outputContent.style.display = isCollapsed ? 'flex' : 'none'; // Use 'flex' for code output
                 outputHeader.querySelector('.mobile-toggle-btn').textContent = isCollapsed ? '▲' : '▼';
             });
+        }
+    }
+
+    function setupPaletteToggle() {
+        // Create toggle button
+        const toggleBtn = document.createElement('button');
+        toggleBtn.className = 'palette-toggle-btn';
+        toggleBtn.innerHTML = '◀'; // Left arrow when expanded
+        toggleBtn.title = 'Toggle Block Palette';
+        
+        // Add to palette
+        blockPalette.appendChild(toggleBtn);
+        
+        // Track collapsed state
+        let isCollapsed = false;
+        
+        // Toggle functionality
+        toggleBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            
+            isCollapsed = !isCollapsed;
+            
+            if (isCollapsed) {
+                blockPalette.classList.add('collapsed');
+                toggleBtn.innerHTML = '▶'; // Right arrow when collapsed
+                toggleBtn.title = 'Expand Block Palette';
+            } else {
+                blockPalette.classList.remove('collapsed');
+                toggleBtn.innerHTML = '◀'; // Left arrow when expanded
+                toggleBtn.title = 'Collapse Block Palette';
+            }
+            
+            // Update workspace layout
+            updateWorkspaceLayout();
+            
+            // Update connection lines after layout change
+            setTimeout(() => {
+                updateAllConnectionLines();
+                adjustSvgLayerSize();
+            }, 300); // Wait for CSS transition to complete
+        });
+        
+        // Double-click to quickly toggle (for convenience)
+        blockPalette.addEventListener('dblclick', (e) => {
+            if (e.target === blockPalette || e.target.closest('.category-header')) {
+                toggleBtn.click();
+            }
+        });
+    }
+
+    function updateWorkspaceLayout() {
+        const workspaceContainer = document.getElementById('workspace-container');
+        
+        // Apply margin adjustment for all devices - consistent behavior
+        if (blockPalette.classList.contains('collapsed')) {
+            if (window.innerWidth <= 768) {
+                workspaceContainer.style.marginLeft = '15px'; // Mobile collapsed width
+            } else {
+                workspaceContainer.style.marginLeft = '20px'; // Desktop collapsed width
+            }
+        } else {
+            workspaceContainer.style.marginLeft = '0';
         }
     }
 
@@ -1500,10 +1565,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Enhanced mobile support functions
     function setupMobileSupport() {
+        // Always setup palette toggle button for all devices
+        setupPaletteToggle();
+        
         if (isMobile || isTouchDevice) {
             touchDevice = true;
             
-            // Add mobile navigation helper
+            // Add mobile navigation helper for touch devices
             const mobileHelper = document.createElement('div');
             mobileHelper.className = 'mobile-nav-helper';
             mobileHelper.innerHTML = 'Drag blocks • Touch connectors to connect • Two fingers to pan/zoom • Long press connections to delete';
@@ -1534,7 +1602,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Setup touch event handlers
             setupTouchEvents();
             
-            // Setup mobile panels
+            // Setup mobile panels for touch devices
             setupMobilePanels();
             
             // Setup collapsible controls

@@ -60,44 +60,60 @@
         font-size: 0.8rem;
     }
     
-    /* Mobile Block Palette - Make wider to prevent text cropping */
+    /* Mobile Block Palette - FIXED to work with collapsible panels */
     #block-palette {
         width: 100%;
-        height: 240px; /* Increased height to accommodate wrapped text */
-        padding: 12px; /* Increased padding */
+        height: auto;
+        max-height: 300px; /* Set a max height instead of fixed */
+        padding: 12px;
         border-right: none;
         border-bottom: 1px solid #4a5568;
-        overflow-x: auto;
-        overflow-y: hidden;
-        display: flex;
-        flex-direction: row;
-        gap: 15px; /* Increased gap */
+        overflow-x: visible; /* Changed from auto */
+        overflow-y: auto; /* Allow vertical scrolling */
+        display: block; /* Changed from flex to block */
+        flex-direction: column; /* Reset to column */
     }
     
     #block-palette h2 {
-        display: none; /* Hide title on mobile */
+        display: block; /* Show title again */
+        margin-bottom: 10px;
+        font-size: 1rem;
     }
     
     .block-category {
-        min-width: 220px; /* Increased from 200px */
-        flex-shrink: 0;
-        margin-bottom: 0;
+        width: 100%; /* Full width instead of min-width */
+        flex-shrink: 1;
+        margin-bottom: 8px;
     }
     
     .category-content {
-        max-height: 140px; /* Increased to accommodate wrapped text */
+        max-height: 120px;
         overflow-y: auto;
+        display: flex;
+        flex-direction: column; /* Ensure vertical layout */
+        gap: 4px;
     }
     
     .palette-block {
         font-size: 0.85rem;
-        padding: 12px 14px; /* Increased padding */
-        margin: 6px 2px;
-        white-space: normal; /* Allow text wrapping on mobile */
+        padding: 8px 12px; /* Reduced padding for mobile */
+        margin: 2px 0; /* Vertical margins only */
+        white-space: normal;
         word-wrap: break-word;
         line-height: 1.3;
         min-height: 20px;
         overflow: visible;
+        width: 100%; /* Full width */
+        box-sizing: border-box;
+    }
+    
+    /* Fix mobile panel content for block palette specifically */
+    #block-palette .mobile-panel-content {
+        display: block !important; /* Override flex layout */
+        flex-direction: column !important;
+        overflow-x: visible !important;
+        overflow-y: auto !important;
+        max-height: 240px; /* Add scrolling if needed */
     }
     
     /* Mobile Workspace Container */
@@ -726,15 +742,304 @@
 /* Improved mobile panel content */
 @media (max-width: 768px) {
     .mobile-panel-content {
-        flex-direction: row;
-        overflow-x: auto;
-        overflow-y: hidden;
-        padding-bottom: 8px;
+        display: flex;
+        flex-direction: column; /* Default to column for mobile */
+        gap: 8px;
+        transition: all 0.3s ease;
+        overflow-y: auto;
+        max-height: 250px;
     }
     
-    /* Ensure code output panel works well */
+    /* Specific override for block palette */
+    #block-palette .mobile-panel-content {
+        display: block !important;
+        flex-direction: column !important;
+        max-height: 240px !important;
+        overflow-y: auto !important;
+    }
+    
+    /* Code output panel should remain flexible */
     #code-output-container .mobile-panel-content {
-        flex-direction: column;
+        flex-direction: column !important;
+        overflow: visible !important;
+        max-height: none !important;
+    }
+}
+
+/* Desktop Block Palette - Collapsible Design */
+#block-palette {
+    position: relative;
+    transition: all 0.3s ease-in-out;
+    width: 300px;
+    background-color: #2d3748;
+    border-right: 1px solid #4a5568;
+    overflow: visible; /* Allow toggle button to be visible when collapsed */
+}
+
+/* Collapsed state for desktop */
+#block-palette.collapsed {
+    width: 20px !important;
+    min-width: 20px !important;
+    overflow: hidden;
+}
+
+#block-palette.collapsed * {
+    opacity: 0;
+    pointer-events: none;
+}
+
+#block-palette.collapsed .palette-toggle-btn {
+    opacity: 1 !important;
+    pointer-events: all !important;
+}
+
+/* Palette Toggle Button */
+.palette-toggle-btn {
+    position: absolute;
+    top: 50%;
+    right: -15px; /* Position on the right edge */
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background-color: #4299e1;
+    color: white;
+    border: 2px solid #2d3748;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: bold;
+    z-index: 1000;
+    transform: translateY(-50%);
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.palette-toggle-btn:hover {
+    background-color: #3182ce;
+    transform: translateY(-50%) scale(1.1);
+}
+
+/* Adjust workspace when palette is collapsed */
+#workspace-container {
+    transition: margin-left 0.3s ease-in-out;
+}
+
+#app-container:has(#block-palette.collapsed) #workspace-container {
+    margin-left: 20px; /* Match collapsed palette width */
+}
+
+/* Consistent Layout for All Devices - No layout changes based on screen size */
+/* Keep the desktop layout structure for all devices */
+#app-container {
+    flex-direction: row !important; /* Always horizontal layout */
+    height: calc(100vh - 51px);
+}
+
+/* Mobile Improvements - Touch and Collapsible Panels ONLY */
+@media (max-width: 768px) {
+    /* Smaller toolbar for mobile */
+    #toolbar {
+        padding: 6px 8px;
+        flex-wrap: wrap;
+        gap: 5px;
+    }
+    
+    .logo {
+        font-size: 0.9rem;
+    }
+    
+    .toolbar-buttons, .toolbar-right {
+        gap: 5px;
+    }
+    
+    #toolbar button {
+        padding: 4px 6px;
+        font-size: 0.75rem;
+    }
+    
+    /* Adjust block palette for mobile - keep same layout, just adjust sizing */
+    #block-palette {
+        width: 280px; /* Slightly narrower for mobile */
+        font-size: 0.85rem;
+    }
+    
+    .palette-block {
+        font-size: 0.8rem;
+        padding: 8px 10px;
+        margin: 2px 0;
+    }
+    
+    /* Make toggle button slightly smaller on mobile */
+    .palette-toggle-btn {
+        width: 25px;
+        height: 25px;
+        right: -12px;
+        font-size: 12px;
+    }
+    
+    /* Adjust collapsed width for mobile */
+    #block-palette.collapsed {
+        width: 15px !important;
+        min-width: 15px !important;
+    }
+    
+    #app-container:has(#block-palette.collapsed) #workspace-container {
+        margin-left: 15px; /* Match smaller collapsed width */
+    }
+    
+    /* Code output adjustments for mobile - keep right side layout */
+    #code-output-container {
+        width: 300px; /* Fixed width for mobile */
+        min-width: 300px;
+        border-left: 1px solid #4a5568;
+        border-top: none; /* No top border, keep right side layout */
+    }
+    
+    #generated-code {
+        font-size: 0.75rem;
+        padding: 8px;
+    }
+    
+    #generate-code-btn {
+        padding: 6px;
+        font-size: 0.8rem;
+    }
+    
+    /* Enhanced Touch Controls - Keep workspace touch-friendly */
+    #workspace {
+        touch-action: none !important;
+        overflow: hidden !important;
+        overscroll-behavior: none !important;
+        user-select: none;
+        -webkit-user-select: none;
+        -webkit-touch-callout: none !important;
+    }
+    
+    #workspace-container {
+        touch-action: none !important;
+        overflow: hidden !important;
+        overscroll-behavior: none !important;
+    }
+    
+    /* Enhanced touch targets for mobile */
+    .connector {
+        width: 28px;
+        height: 28px;
+        touch-action: none !important;
+    }
+    
+    .script-block {
+        touch-action: none !important;
+        user-select: none !important;
+        min-width: 140px;
+    }
+    
+    .script-block-content input,
+    .script-block-content textarea,
+    .script-block-content select {
+        touch-action: manipulation !important;
+        user-select: text !important;
+        font-size: 16px !important; /* Prevent zoom on iOS */
+    }
+    
+    /* Better touch targets for connections */
+    .connection-line {
+        stroke-width: 8px;
+    }
+    
+    .connection-line:hover,
+    .connection-line.hover {
+        stroke-width: 10px;
+    }
+    
+    /* Mobile workspace controls positioning */
+    .workspace-controls {
+        bottom: 10px;
+        right: 10px;
+        padding: 6px;
+    }
+    
+    .workspace-controls button {
+        width: 36px;
+        height: 36px;
+        font-size: 16px;
+        margin: 2px;
+    }
+    
+    .controls-toggle-btn {
+        width: 36px;
+        height: 36px;
+    }
+}
+
+/* Tablet adjustments - keep desktop layout but adjust sizing */
+@media (min-width: 769px) and (max-width: 1024px) {
+    #block-palette {
+        width: 290px;
+        padding: 12px;
+    }
+    
+    .palette-block {
+        font-size: 0.9rem;
+        padding: 12px 14px;
+        white-space: normal;
+        word-wrap: break-word;
+        line-height: 1.3;
+    }
+    
+    #code-output-container {
+        width: 320px;
+    }
+}
+
+/* Desktop - ensure toggle button works properly */
+@media (min-width: 1025px) {
+    #block-palette {
+        width: 300px;
+    }
+    
+    .palette-block {
+        white-space: normal;
+        word-wrap: break-word;
+        line-height: 1.3;
         overflow: visible;
+    }
+}
+
+/* Touch device adjustments - larger touch targets */
+@media (hover: none) and (pointer: coarse) {
+    .connector {
+        width: 32px;
+        height: 32px;
+    }
+    
+    .workspace-controls button {
+        width: 44px;
+        height: 44px;
+        font-size: 18px;
+    }
+    
+    .controls-toggle-btn {
+        width: 44px;
+        height: 44px;
+        font-size: 18px;
+    }
+    
+    .connection-line {
+        stroke-width: 8px;
+    }
+    
+    .palette-block {
+        padding: 12px;
+        margin: 8px 3px;
+    }
+    
+    .delete-block,
+    .block-collapse-btn {
+        width: 24px;
+        height: 24px;
+        font-size: 14px;
     }
 }
